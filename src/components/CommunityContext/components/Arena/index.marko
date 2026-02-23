@@ -1,0 +1,518 @@
+
+import PostNotFoundImage from './../../../../assets/question-illustration.png'
+
+static function getStatusColor( value ){
+  switch( value.toLowerCase() ){
+    case 'new': return 'warning'
+    case 'open': return 'success'
+    case 'close': return 'info'
+  }
+}
+
+class {
+  onCreate({ App, profile }){
+    this.state = { 
+      post: null,
+      comments: [],
+      mountAction: {},
+      showDialog: false
+    }
+
+    this.me = profile
+    App.extend(this)
+  }
+  onMount(){ this.getPost() }
+  getURLPath( type ){
+    switch( type ){
+      case 'post': return `${this.App.data.baseURL}/community/${this.input.communityId}`
+      case 'comment': return `${this.App.data.baseURL}/community/post/${this.input.postId}`
+    }
+  }
+  scrollUp(){
+		const elem = this.getEl('scroll-body')
+		$(elem).animate({ scrollTop: elem.scrollHeight }, 400 )
+
+		debugLog('Scroll Chat Content Up: ')
+	}
+  dialog( options ){ this.state.showDialog = options }
+  appendComment( comment, threadId ){
+    
+		// Append new comment to a thread
+		if( threadId ){
+			this.state.comments = this.state.comments.map( each => {
+				// Update comment in a sub thread
+				if( each.commentId == threadId ){
+					each.thread.total++
+					each.thread.list.push( comment )
+				}
+				
+				return newObject( each )
+			} )
+		
+			this.setStateDirty('comments')
+			debugLog('Appended new Comment to a thread: ', comment )
+			return
+		}
+    
+		// First comment
+		if( !this.state.comments.length )
+			this.state.comments = [ comment ]
+
+		// Display new comment
+		else this.state.comments.push( comment )
+	
+		this.setStateDirty('comments')
+		debugLog('Appended new Comment: ', comment )
+	}
+	updateComment( datetime, updates, replyTo ){
+		// Apply update to displayed comment
+		this.state.comments = this.state.comments.map( each => {
+			// Update comment in a sub thread
+			if( replyTo && each.datetime == replyTo.datetime )
+				each.thread.list = each.thread.list.map( comment => {
+					if( comment.datetime == datetime 
+							|| ( updates.commentId && comment.commentId == updates.commentId ) )
+						comment = { ...comment, ...updates }
+
+					return comment
+				} )
+			
+			// Update comment in the main thread
+			else if( each.datetime == datetime )
+				each = { ...each, ...updates }
+				
+			return newObject( each )
+		} )
+		
+		this.setStateDirty('comments')
+		debugLog('Updated Comment: ', datetime, updates )
+	}
+  removeComment( datetime ){
+		// Remove a comment from a given section
+		this.state.comments = this.state.comments.filter( each => { return each.datetime != datetime } )
+
+		this.setStateDirty('comments')
+		debugLog('Comment Deleted: ', datetime )
+	}
+
+  onAction( type, dataset ){
+
+		if( type === false ){
+			debugLog('Previously mounted action is cancelled')
+			this.setState('mountAction', {} )
+			return
+		}
+
+		debugLog(`Mount <${type} action> to excute on a comment: `, dataset )
+		
+		switch( type ){
+			case 'edit': 
+			case 'reply': this.setState( 'mountAction', { type, dataset } ); break
+			// Delete comment is prompt therefore doesn't require to be mounted
+			case 'delete': this.deleteComment( dataset ); break
+
+			default: this.setState( 'mountAction', {} )
+		}
+	}
+  onApplyChange( changes, ack ){
+		/* Apply changes that occured after in
+			relation with the previous comment action
+			mounted: Edit, Reply, Reactions, ...
+
+			Drop mounted action after changes get applied
+			successfully.
+		*/
+		if( isEmpty( this.state.mountAction ) ) return
+
+		debugLog(`Change of <${this.state.mountAction.type} action> application returned: `, changes )
+		switch( this.state.mountAction.type ){
+			// Edit action concern the comment's text content only for now
+			case 'edit': this.sendCommentUpdate({ content: changes }); break
+		}
+
+		// Unmount current action: No more valid
+		debugLog(`Unmount <${this.state.mountAction.type} action>`)
+		this.onAction( false )
+
+		// Acknowledge reception of comment from textarea
+		debugLog('Clear comment Textarea')
+		typeof ack == 'function' && ack()
+	}
+  onToSend( body, ack ){
+		debugLog('Send new Comment: ', body )
+		// Display comment
+		const 
+		datetime = Date.now(),
+		comment = {
+			...body,
+			sender: this.me,
+			likes: { total: 0 },
+			datetime,
+			status: 'SENDING'
+		}
+    
+		this.appendComment( comment, false )
+		this.once( 'update', this.scrollUp )
+    
+		// Acknowledge reception of comment from textarea
+		debugLog('Clear comment Textarea')
+		typeof ack == 'function' && ack()
+
+		/* `Send` will be trigger after medias attached to 
+			the comment are uploaded successfully
+		*/
+		if( !Array.isArray( comment.medias ) || comment.medias.length ) return
+
+		debugLog('No medias attached to the comment')
+		// Send comment right away (Contain only message)
+		this.sendComment( datetime, body, false )
+	}
+	onToReply( body, ack ){
+		debugLog('Send a Reply to a Comment: ', body )
+
+		// No comment mounted for reply or invalid dataset
+		if( this.state.mountAction.type !== 'reply'
+				|| typeof this.state.mountAction.dataset !== 'object'
+				|| !this.state.mountAction.dataset.thread ){
+			debugLog('No Chat mounted for reply')
+			return
+		}
+		
+		// Display comment
+		const 
+		datetime = Date.now(),
+		refComment = this.state.mountAction.dataset,
+		comment = {
+			...body,
+			sender: this.me,
+			likes: { total: 0 },
+			datetime,
+			status: 'SENDING'
+		}
+		
+		// Add the comment to the reference thread
+		this.appendComment( comment, refComment.commentId )
+		
+		// Acknowledge reception of comment from textarea
+		debugLog('Clear comment Textarea')
+		this.onAction( false )
+		typeof ack == 'function' && ack()
+
+		/* `Send` will be trigger after medias attached to 
+			the new reply comment are uploaded successfully
+		*/
+		if( !Array.isArray( body.medias ) || body.medias.length ) return
+
+		debugLog('No medias attached to the reply comment')
+		// Send the reply comment right away (Contain only message)
+		this.sendComment( datetime, body, refComment )
+	}
+
+  async getPost(){
+    try {
+      const 
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, post } = await this.App.Request(`${this.getURLPath('post')}/post/${this.input.postId}`, payload )
+      if( error ) throw new Error( message )
+			
+      this.state.post = post
+
+      // Information about the author of the post
+      this.state.post.author = this.input.members[ post.created.by ] || {}
+      // Fetch post comments
+      this.getComments()
+    }
+    catch( error ){
+      debugLog('Failed Retreive Post: ', error )
+      this.state.post = {}
+    }
+  }
+  async getComments(){
+    try {
+      const
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, comments } = await this.App.Request(`${this.getURLPath('comment')}/comments`, payload )
+      if( error ) throw new Error( message )
+			
+      this.state.comments = comments
+    }
+    catch( error ){ debugLog('Failed Retreive Post: ', error ) }
+  }
+	async sendComment( temptime, body, replyTo ){
+		/* Use `temptime` (temporary local time) as id of 
+			the comment in the section display thread for
+			preliminary updates.
+		*/
+		try {
+			const
+			payload = {
+				method: 'POST',
+				headers: this.App.data.headers,
+				body
+			}
+			debugLog('Submit Comment API Request: ', payload )
+
+			const { error, message, commentId } = await this.App.Request(`${this.getURLPath('comment')}/comment/add${replyTo ? '?replyTo='+ replyTo.commentId : ''}`, payload )
+			if( error ) throw new Error( message )
+			
+			const updates = {
+				commentId, 
+				medias: body.medias, // Update with CDN media links if upload happened
+				status: 'SENT' 
+			}
+
+			// Update sub/reply thread
+			if( replyTo )
+				this.updateComment( temptime, updates, replyTo )
+			
+			// Main thread
+			else {
+				this.updateComment( temptime, updates, false )
+				this.scrollUp()
+			}
+		}
+		catch( error ){
+			debugLog('Failed Sending Comment: ', error )
+			this.updateComment( temptime, { status: 'FAILED' }, false )
+		}
+	}
+	async sendCommentUpdate( updates ){
+		const { commentId, datetime } = this.state.mountAction.dataset
+		
+		// Pre-apply changes locally before it get send
+		debugLog('Apply Comment changes locally before they get send to server: ', updates )
+		this.updateComment( datetime, { ...updates, status: 'SENDING' }, false )
+		try {
+			const
+			payload = {
+				method: 'PATCH',
+				headers: this.App.data.headers,
+				body: updates
+			}
+			debugLog('Send Comment Update API Request: ', payload )
+
+			const { error, message, comment } = await this.App.Request(`${this.getURLPath('comment')}/comment/${commentId}/edit`, payload )
+			if( error ) throw new Error( message )
+			
+			debugLog('Confirmation of changes applied successfully: ', comment )
+			this.updateComment( datetime, { ...updates, status: 'SENT' }, false )
+		}
+		catch( error ){
+			debugLog('Failed Sending Comment Updates: ', error )
+			this.updateComment( datetime, { status: 'FAILED' }, false )
+		}
+	}
+	async deleteComment( comment, confirmed ){
+
+		// Require confirmation
+		if( confirmed !== true ){
+			debugLog('Ask confirmation to delete Comment')
+			
+			const content = `<br><br><div class="theme-bg rounded px-1 py-75"><i class="bx bxs-quote-alt-right font-large-1 float-left" style="padding-right:1rem"></i><p>${comment.content}</p></div>`
+			this.dialog({
+				type: 'warning',
+				message: `Are you sure you want to delete this content? This cannot be undone. ${content}`,
+				actions: { yes: (function(){ this.deleteComment( comment, true ) }).bind(this) }
+			})
+			return
+		}
+
+		try {
+			const
+			payload = {
+				method: 'DELETE',
+				headers: this.App.data.headers
+			}
+			debugLog('Delete Comment API Request: ', payload )
+
+			const { error, message } = await this.App.Request(`${this.getURLPath('comment')}/comment/${comment.commentId}/delete`, payload )
+			if( error ) throw new Error( message )
+			
+			debugLog('Confirmation: ', message )
+			this.removeComment( comment.datetime )
+		}
+		catch( error ){ debugLog('Failed Deleting Comment: ', error ) }
+	}
+	async deletePost( confirmed ){
+
+		// Require confirmation
+		if( confirmed !== true ){
+			debugLog('Ask confirmation to delete Post')
+			
+			this.dialog({
+				type: 'warning',
+				message: `Are you sure you want to delete this post? This cannot be undone.`,
+				actions: { yes: (function(){ this.deletePost( true ) }).bind(this) }
+			})
+			return
+		}
+
+		try {
+			const
+			payload = {
+				method: 'DELETE',
+				headers: this.App.data.headers
+			}
+			debugLog('Delete Post API Request: ', payload )
+
+			const { error, message } = await this.App.Request(`${this.getURLPath('post')}/post/${this.state.post.postId}/delete`, payload )
+			if( error ) throw new Error( message )
+			
+			debugLog('Confirmation: ', message )
+			this.emit('home')
+		}
+		catch( error ){ debugLog('Failed Deleting Post: ', error ) }
+	}
+}
+
+
+<if( state.post === null )>
+  <div.d-flex.align-items-center.justify-content-center style="height:75vh">
+    <div.w-75.text-center>
+      <Preloader.font-large-1 active=true/>
+    </div>
+  </div>
+</if>
+
+<else-if( isEmpty( state.post ) )>
+  <div.d-flex.align-items-center.justify-content-center style="height:75vh">
+    <div.w-75.text-center>
+      <Image.img-fluid.w-75 src=PostNotFoundImage/>
+      <br><br><br>
+      <h6>
+        <Locale>
+          This post is no where to be Found. It might be remove, or move by the poster.
+        </Locale>
+      </h6>
+
+      <br>
+      <button.btn.btn-secondary.round on-click( () => component.emit('home') )>
+        <Locale text="Go back"/>
+      </button>
+    </div>
+  </div>
+</else-if>
+
+<else>
+  <div.content-wrapper.scroll-body style="min-height:calc(100% - 12rem);padding:0 0 4rem 0">
+    <div.arena-content>
+      <!-- Post information -->
+      <section.post.px-2>
+        $ const { status, title, body, tags, attachments, answers, author, created } = state.post
+
+        <div.position-sticky.theme-bg.py-1 style="top:3.5rem">
+					<!-- Title -->
+					<h5>${title}</h5>
+
+					<!-- Caption -->
+					<div.font-small-3.py-25.d-flex.align-items-center>
+						<span.badge.round.mr-4 class=`badge-${getStatusColor(status)}`>
+							<Locale text=status.toCapitalCase()/>
+						</span>
+						<span.text-muted.px-50>203k Views</span>
+						<!-- <span.text-muted.px-50>Active Now</span> -->
+					</div>
+				</div>
+        <br>
+
+        <!-- Body -->
+        <p>$!{body}</p>
+
+        <!-- Attachments -->
+        <if( Array.isArray( attachments ) && attachments.length )>
+          <div.attachments>
+            <h5.font-small-3.text-muted><Locale text="Attachments"/></h5>
+            <ul.list-inline>
+              <li.card.m-25.cursor-pointer>
+                <Bx.font-large-1.p-3.text-success type="file"/>
+              </li>
+              <li.card.m-25.cursor-pointer>
+                <Bx.font-large-1.p-3.text-info type="volume-full"/>
+              </li>
+              <li.card.m-25.cursor-pointer>
+                <Bx.font-large-1.p-3.text-danger type="film"/>
+              </li>
+              <li.card.m-25.cursor-pointer>
+                <Bx.font-large-1.p-3.text-warning type="image"/>
+              </li>
+            </ul>
+          </div>
+        </if>
+
+        <!-- Categories -->
+        <if( tags.length )>
+          <ul.list-inline>
+            <for|tag, index| of=tags>
+              <li.px-1.py-25.m-25.border.round.text-muted.font-small-3>${tag}</li>
+            </for>
+          </ul>
+        </if>
+        
+        <Row>
+          <!-- Toggle Actions -->
+          <@col>
+            <ul.list-inline.m-0.py-1>
+              <li.px-50.cursor-pointer><Bx.font-medium-4 type="bookmark"/></li>
+              <!-- <li.px-50.cursor-pointer><Bx.font-medium-4 type="comment-add"/></li> -->
+
+							<!-- Edit or Delete only when no comments added -->
+              <if( component.me.id == created.by && !answers.length )>
+                <li.px-50.cursor-pointer on-click( () => component.emit('edit-post', state.post ) )>
+									<Bx.font-medium-4 type="pencil"/>
+								</li>
+								<li.px-50.cursor-pointer on-click('deletePost', false )>
+									<Bx.font-medium-4 type="trash"/>
+								</li>
+              </if>
+            </ul>
+          </@col>
+          <!-- Author -->
+          <@col.col-4>
+            <div.d-flex.align-items-center>
+              <div class="avatar">
+                <Image.avatar-image src=(author.photo || '/images/default/user.png') alt="avatar"/>
+              </div>
+              <div.w-100.pl-4>
+                <h6.font-medium-1.my-0>${author.name || Locale('Unknown')}</h6>
+                <span.font-small-3.text-muted>${formatDate( created.at, 'calendar' )}</span>
+              </div>
+            </div>
+          </@col>
+        </Row>
+      </section>
+      
+      <!-- Answers & Comments -->
+      <if( state.comments.length )>
+        <Sections list=state.comments
+									answers=state.post.answers
+									me=component.me
+									on-edit('onAction', 'edit')
+									on-reply('onAction', 'reply')
+									on-delete('onAction', 'delete')
+									on-bookmark('onAction', 'bookmark')/>
+      </if>
+    </div>
+  </div>
+  
+  <!-- Answer/Comment Editor -->
+  <Textarea type="content"
+            mode="advanced"
+						action=state.mountAction
+						placeholder=`Add your answer / comment`
+						on-press-enter( state.mountAction.type === 'reply' ? 'onToReply' : 'onToSend' )
+						on-action-change('onApplyChange')
+						on-cancel-action('onAction', false )/>
+</else>
+
+<!-- Prompt dialog for important alerts & actions confirmation -->
+<if( state.showDialog )>
+	<DialogModal ...state.showDialog 
+								hs=8 qs=10
+								on-dismiss('dialog', false )/>
+</if>

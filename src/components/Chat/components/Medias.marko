@@ -1,0 +1,132 @@
+import moment from 'moment'
+
+class {
+  onCreate({ medias }){
+    this.state = { uploading: false }
+    this.medias = medias
+  }
+  onInput({ medias, message, status }){
+    /* Check whether raw file is sent for 
+      upload. In that case, upload before 
+      send message
+    */
+    if( status !== 'SENDING' ) return
+    if( !medias.filter( ({ raw }) => { return !!raw } ).length ){
+      this.emit( 'action', 'send-chat', { message, medias }, false )
+      return
+    }
+
+    // Medias files to upload before sending the message
+    this.upload( medias.map( ({ raw }) => { return raw } ) )
+  }
+  upload( files ){
+    debugLog('Prepare Chat Medias to upload')
+
+    const data = new FormData()
+    files.map( each => data.append( 'file', each ) )
+    
+    $.ajax({
+      url: '/assets/upload/Bloum--medias',
+      type: 'POST',
+      data,
+      cache: false,
+      contentType: false,
+      processData: false,
+      beforeSend: () => this.state.uploading = true,
+      complete: () => this.state.uploading = false,
+      success: ({ error, links }) => {
+        // Replace local link with CDN links
+        for( let idx = 0; idx < links.length; idx++ ){
+          this.medias[ idx ].source = links[ idx ]
+          this.medias[ idx ].status = 'UPLOADED'
+          
+          delete this.medias[ idx ].raw
+        }
+        debugLog('Chat Medias Uploaded Successfully: ', this.medias )
+        
+        // Send updates back to be send
+        this.emit('uploaded', { message: this.input.message, medias: this.medias }, false )
+      },
+      error: ( xhr, status, error ) => {
+        debugLog('Chat Medias Uploading Failed: ', status +':'+ error )
+        this.setState({ status: 'FAILED', uploading: false })
+      },
+      xhr: () => {
+        // Watching uploading
+        let xhr = new window.XMLHttpRequest()
+
+        xhr.upload.addEventListener( 'progress', e => {
+          if( !e.lengthComputable ) return
+          this.state.uploading = Math.round( ( e.loaded / e.total ) * 100 ) // Uploaded percentage
+        }, false )
+
+        return xhr
+      }
+    })
+  }
+}
+
+<div.chat-media-container.position-relative.w-100.overflow-hidden>
+  <!-- Display Media -->
+  $ const [ type, extension ] = input.medias[0].type.split('/')
+  <Switch by=type>
+    <@case is="image">
+      <img.img-fluid.h-100 
+          class=( state.uploading ? 'chat-media-uploading' : false ) 
+          src=input.medias[0].source/>
+    </@case>
+    <@case is=['text', 'application']>
+      <div.px-2.py-3.d-flex.justify-content-center>
+        <img.img-fluid.h-100 
+            src=`/images/mime_types/${extension}.png` 
+            style="width:120px"/>
+      </div>
+    </@case>
+    <@case is="video">
+      <video.img-fluid.h-100.d-block
+            class=( state.uploading ? 'chat-media-uploading' : false ) 
+            src=input.medias[0].source
+            controls></video>
+    </@case>
+  </Switch>
+
+  <!-- Medias handle controls -->
+  <div.position-absolute.top-0.left-0.hover-show>
+    <ul.chat-media-options.list-inline.m-50>
+      <li.cursor-pointer><Bx.font-medium-4.px-50.py-25 type="download"/></li>
+      <li.cursor-pointer><Bx.font-medium-4.px-50.py-25 type="share"/></li>
+      <li.cursor-pointer><Bx.font-medium-4.px-50.py-25 type="expand-alt"/></li>
+    </ul>
+  </div>
+
+  <!-- Chat time display in case no message attached to media -->
+  <if( !input.message )>
+    <!-- Chat menu -->
+    <Bx.chat-menu.position-absolute.zindex-2.right-0.top-0.p-25.m-25.theme-bg-transparent.font-medium-4.hover-inline.cursor-pointer
+        type="dots-vertical-rounded"
+        style="padding-left:1rem"
+        on-click( () => component.emit('show-options') )/>
+
+    <div.position-absolute.bottom-0.right-0.p-1>
+      <if( input.status == 'FAILED' )>
+        <Bx.font-medium-5.text-danger
+            type="info-circle"
+            style="padding-left:1rem"
+            on-click( () => component.emit('action', 'resend-chat') )/>
+      </if>
+      <else><span.chat-time>${moment( input.datetime ).format('hh:mm A')}</span></else>
+    </div>
+
+    <!-- Chat Tread -->
+    <if( input.thread && input.thread.total )>
+      <Thread ...input.thread/>
+    </if>
+  </if>
+  
+  <!-- Display uploading progressbar -->
+  <if( state.uploading )>
+    <div.position-absolute.bottom-0.w-100 style="height:4px">
+      <div.progress-bar.h-100.theme-bg-primary style=`width:${state.uploading +'%'}`></div>
+    </div>
+  </if>
+</div>

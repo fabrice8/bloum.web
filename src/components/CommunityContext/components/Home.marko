@@ -1,0 +1,248 @@
+
+import QuestionTagImage from './../../../assets/posts.png'
+
+static function getStatusColor( value ){
+  switch( value.toLowerCase() ){
+    case 'new': return 'warning'
+    case 'open': return 'success'
+    case 'close': return 'info'
+  }
+}
+
+class {
+	onCreate({ App }){
+		this.state = {
+      posts: null,
+			activeTags: []
+		}
+
+    App.extend(this)
+	}
+  onMount(){ this.fetchPosts() }
+  onFilter( tag ){
+    !this.state.activeTags.includes( tag ) ?
+                    this.state.activeTags.push( tag )
+                    : this.state.activeTags = this.state.activeTags.filter( each => { return each !== tag } )
+
+    this.setStateDirty('activeTags')
+  }
+
+  async fetchPosts(){
+    try {
+      const
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, posts } = await this.App.Request(`${this.App.data.baseURL}/community/${this.input.communityId}/posts`, payload )
+      if( error ) throw new Error( message )
+      
+      this.state.posts = posts
+    }
+    catch( error ){ debugLog('Failed Fetching Community Posts: ', error ) }
+  }
+}
+
+
+<div.content-wrapper style="min-height:calc(100% - 9rem)">
+  <div.post-content>
+    <if( state.posts === null )>
+      <div.d-flex.align-items-center.justify-content-center  style="height:75vh">
+        <div.w-75.text-center>
+          <Preloader.font-large-1 active=true/>
+        </div>
+      </div>
+    </if>
+
+    <else-if( !state.posts.length )>
+      <div.d-flex.align-items-center.justify-content-center>
+        <div.w-75.text-center>
+          <Image.img-fluid src=QuestionTagImage/>
+          <br>
+          <h6>
+            <Locale text="Bring your"/> 
+            ${input.name} 
+            <Locale>posts & questions here and let discuss them together.</Locale>
+          </h6>
+
+          <br><br>
+          <button.btn.btn-secondary.round on-click( () => component.emit('post-question') )>
+            <Locale text="Ask first question"/>
+          </button>
+        </div>
+      </div>
+    </else-if>
+
+    <else>
+      <Row.m-0>
+        <@col qs="col-12" hs="col-8" fs="col-8" class="px-2 py-1">
+          <h5.font-medium-3>
+            <Locale text="Posts"/>
+          </h5> 
+
+          <!--
+          <section.py-75>
+            <div.text-muted.py-50>
+              <Locale text="Most Active"/>
+            </div> -->
+            <Row>
+              <for|{ postId, title, body, status, answers, tags, comments, datetime }| of=state.posts>
+                <!-- Display all post or by tags filter -->
+                <if( !state.activeTags.length 
+                    || tags.filter( each => { return state.activeTags.includes( each ) } ).length )>
+                  <@col fs="col-6" hs="col-12" qs="col-12">
+                    <div.card.px-2.py-75.my-25.font-medium-1.cursor-pointer on-click( () => component.emit( 'open', postId ) )>
+                      ${title}
+      
+                      <div.font-small-2.py-25>
+                        <span class=`text-${getStatusColor(status)}`><Locale text=status.toCapitalCase()/></span>
+                        <span.text-muted.pl-4>${comments && comments.total || 0} <Locale text="Answers & Comments"/></span>
+                        <span.text-muted.float-right>${formatDate( datetime, 'calendar' )}</span>
+                      </div>
+                    </div>
+                  </@col>
+                </if>
+              </for>
+            </Row>
+          <!-- </section>
+          
+          <section.py-75>
+            <div.text-muted.py-50>
+              <Locale text="Recommandation"/>
+            </div>
+  
+            <Row>
+              <@col fs="col-6" hs="col-12" qs="col-12">
+                <div.card.px-2.py-75.my-25.font-medium-2.cursor-pointer>
+                  Atomic Element Composite
+  
+                  <div.font-small-2.py-25>
+                    <span.text-muted>233 <Locale text="Comments"/></span>
+                    <span.text-muted.float-right>January 22, 1029</span>
+                  </div>
+                </div>
+              </@col>
+              <@col fs="col-6" hs="col-12" qs="col-12">
+                <div.card.px-2.py-75.my-25.font-medium-2.cursor-pointer>
+                  Entanglement Stage
+  
+                  <div.font-small-2.py-25>
+                    <span.text-muted>233 <Locale text="Comments"/></span>
+                    <span.text-muted.float-right>January 22, 1029</span>
+                  </div>
+                </div>
+              </@col>
+            </Row>
+          </section>
+  
+          <section.py-75>
+            <div.text-muted.py-50>
+              <Locale text="Others"/>
+            </div>
+            
+            <Row>
+              <@col fs="col-6" hs="col-12" qs="col-12">
+                <div.card.px-2.py-75.my-25.font-medium-2.cursor-pointer>
+                  Atomic Element Composite
+  
+                  <div.font-small-2.py-25>
+                    <span.text-muted>233 <Locale text="Comments"/></span>
+                    <span.text-muted.float-right>January 22, 1029</span>
+                  </div>
+                </div>
+              </@col>
+              <@col fs="col-6" hs="col-12" qs="col-12">
+                <div.card.px-2.py-75.my-25.font-medium-2.cursor-pointer>
+                  Entanglement Stage
+  
+                  <div.font-small-2.py-25>
+                    <span.text-muted>233 <Locale text="Comments"/></span>
+                    <span.text-muted.float-right>January 22, 1029</span>
+                  </div>
+                </div>
+              </@col>
+            </Row>
+          </section> -->
+        </@col>
+
+        <@col qs="d-none" hs="col-4" fs="col-4">
+          <div.position-sticky style="top:170px">
+            <!-- Display Tags -->
+            <if( Array.isArray( input.tags ) && input.tags.length )>
+              <section>
+                <h5.font-medium-1>
+                  <Locale text="Tags"/>
+                </h5>
+      
+                <for|each, index| of=input.tags>
+                  <button.btn.btn-sm.m-25.round 
+                          class=( state.activeTags.includes( each ) ? 'btn-secondary' : 'btn-outline-secondary')
+                          key=index
+                          on-click('onFilter', each )>
+                    <Locale text=each.toCapitalCase()/>
+                  </button>
+                </for>
+              </section>
+            </if>
+
+            <!-- Display members -->
+            <if( input.isPrivate )>
+              <section>
+                <h5.font-medium-1>
+                  <Locale text="Members"/>
+                </h5>
+                
+                <ul.list-unstyled.users-list.m-0.d-flex.align-items-center.justify-content-end>
+                  $ const members = Object.values( input.members )
+                  
+                  <if( members.length > 3 )>
+                    <for|index| from=0 to=2 step=1>
+                      $ const { id, photo, name } = members[ index ]
+                      <li.avatar.pull-up.shadow key=index title=name on-click( emit, 'show-profile', id )>
+                        <Image.rounded-circle.border-none 
+                              src=(photo || '/images/default/user.png') 
+                              alt="Avatar" 
+                              style="width:30px;height:30px"/>
+                      </li>
+                    </for>
+      
+                    <!-- Remaing number of members -->
+                    <li.avatar.border.theme-bg-transparent.pl-50.d-flex.align-items-center
+                        style="width:30px;height:30px"
+                        on-click( emit, 'view-members', 'group', id, members )>
+                      <p.text-muted.mb-0.font-small-3>+${members.length - 3}</p>
+                    </li>
+                  </if>
+                  <else>
+                    <for|{ id, photo, name }, index| of=members>
+                      <li.avatar.pull-up.shadow key=index title=name on-click( emit, 'show-profile', id )>
+                        <Image.rounded-circle.border-none 
+                              src=(photo || '/images/default/user.png') 
+                              alt="Avatar" 
+                              style="width:30px;height:30px"/>
+                      </li>
+                    </for>
+      
+                    <!-- Add more member toggler -->
+                    <li.avatar.border.theme-bg-transparent.d-flex.align-items-center.justify-content-center 
+                        style="width:30px;height:30px"
+                        on-click( emit, 'add-member', 'group', id, members )>
+                      <Bx type="plus"/>
+                    </li>
+                  </else>
+                </ul>
+              </section>
+            </if>
+
+            <section>
+              <br><br>
+              <button.btn.btn-secondary.round on-click( () => component.emit('post-question') )>
+                <Locale text="Ask question"/>
+              </button>
+            </section>
+          </div>
+        </@col>
+      </Row>
+    </else>
+  </div>
+</div>

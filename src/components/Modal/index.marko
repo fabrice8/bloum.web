@@ -1,0 +1,28 @@
+
+class {
+  onCreate({ options }){ this.state = { type: options.type } }
+  onSwitch( optionType ){ this.state.type = optionType }
+}
+
+<Switch by=state.type>
+  <@case is="community">
+    <CreateCommunity ...input
+                  on-done( dataset => component.emit('done', 'community', dataset ) )
+                  on-dismiss( () => component.emit('dismiss') )/>
+  </@case>
+  <@case is="group">
+    <CreateGroup ...input
+                  on-done( dataset => component.emit('done', 'group', dataset ) )
+                  on-dismiss( () => component.emit('dismiss') )/>
+  </@case>
+  <@case is="add-member">
+    <AddMember ...input
+                on-done( dataset => component.emit('done', 'group', dataset ) )
+                on-dismiss( () => component.emit('dismiss') )/>
+  </@case>
+  <@case is="view-members">
+    <Members ...input
+              on-add('onSwitch', 'add-member')
+              on-dismiss( () => component.emit('dismiss') )/>
+  </@case>
+</Switch>

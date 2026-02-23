@@ -1,0 +1,46 @@
+
+class {
+  onCreate(){
+    this.state = { active: 'smile' }
+  }
+}
+
+<div.p-1.overflow-auto style="height:220px">
+  <div.position-relative.d-flex.align-items-end>
+    <!-- Dismiss assets block -->
+    <span.cursor-pointer.mx-25 on-click( () => component.emit('dismiss') )>
+      <Bx.font-medium-4.p-25.border.rounded type="x"/>
+    </span>
+    <!-- Emoji -->
+    <span.cursor-pointer.mx-25>
+      <Bx.font-medium-4.p-25.border.rounded
+          class=(state.active !== 'smile' ? 'text-muted' : false)
+          type="smile"/>
+    </span>
+    <!-- Library -->
+    <span.cursor-pointer.mx-25>
+      <Bx.font-medium-4.p-25.border.rounded
+          class=(state.active !== 'library' ? 'text-muted' : false)
+          type="book"/>
+    </span>
+    <!-- Bookmarks -->
+    <span.cursor-pointer.mx-25>
+      <Bx.font-medium-4.p-25.border.rounded
+          class=(state.active !== 'bookmark' ? 'text-muted' : false)
+          type="bookmark"/>
+    </span>
+  </div>
+
+  <Switch by=input.type>
+    <@case is="emoji">
+      <div>
+        
+      </div>
+    </@case>
+    <@case is="files">
+      <div>
+        
+      </div>
+    </@case>
+  </Switch>
+</div>

@@ -1,0 +1,43 @@
+
+import moment from 'moment'
+
+class {
+  // Handle control actions trigger on a chat
+  onAction( chat, _event, ...args ){ this.emit( _event, chat, ...args ) }
+  // Handle events that happened on a chat
+  onEvent( inSectionId, _event, ...args ){ this.emit( _event, inSectionId, ...args ) }
+}
+
+$ const { list, me, chain, highlight } = input
+<if( input.list.length )>
+  <div>
+    <div.divider>
+      <div.divider-text.py-25.round>
+        <Locale.font-small-2 
+                class=( highlight ? 'text-success' : '' )
+                text=( highlight ? 'NEW' : moment( list[0].datetime ).calendar() )/>
+      </div>
+    </div>
+    
+    <for|chat, index| of=input.list>
+      <Switch by=chat.sender key=`${index}-${chat.datetime}`>
+        <@case is="bot">
+          <ChatBot ...chat/>
+        </@case>
+        <@case is=me.id>
+          <Chat ...chat
+                me=true
+                on-action('onAction', chat )
+                on-event('onEvent', chat.datetime )/>
+        </@case>
+
+        <!-- Peer or group member -->
+        <@default>
+          <Chat ...chat
+                on-action('onAction', chat )
+                on-event('onEvent', chat.datetime )/>
+        </@default>
+      </Switch>
+    </for>
+  </div>
+</if>

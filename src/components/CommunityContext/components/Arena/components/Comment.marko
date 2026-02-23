@@ -1,0 +1,41 @@
+
+<div style="width:calc(100% - 7rem);margin-left:5rem">
+  <!-- Author avatar -->
+  <div.float-left style="margin-left:-3.5rem">
+    <a class="avatar m-0">
+      <img src=(input.sender.photo || '/images/default/user.png') alt="avatar" height="36" width="36">
+    </a>
+  </div>
+  
+  <div.card.px-2.py-75.shadow-none.border.hover-toggle>
+    <!-- Author name & datetime -->
+    <h6.font-small-3.m-0>
+      <span.text-muted>${input.sender.name}</span>
+      <span.float-right.text-muted>${formatDate( input.datetime, 'calendar' )}</span>
+    </h6>
+
+    <!-- Content of Comment -->
+    <p.mt-2.mb-0>$!{input.content}</p>
+
+    <!-- Toggle Actions -->
+    <ul.list-inline.m-0>
+      <li.px-50.cursor-pointer.d-inline-flex.align-items-center>
+        <Bx.font-medium-4 type="like"/>
+        <span.px-50>${input.likes.total}</span>
+      </li>
+
+      <if( input.sender.id == input.me.id )>
+        <li.px-50.cursor-pointer.hover-show
+            on-click( () => component.emit('action', 'edit', input.commentId ) )>
+          <Bx.font-medium-4 type="pencil"/>
+        </li>
+        <li.px-50.cursor-pointer.hover-show
+            on-click( () => component.emit('action', 'delete', input.commentId ) )>
+          <Bx.font-medium-4 type="trash"/>
+        </li>
+      </if>
+
+      <li.px-50.cursor-pointer.hover-show><Bx.font-medium-4 type="bookmark"/></li>
+    </ul>
+  </div>
+</div>

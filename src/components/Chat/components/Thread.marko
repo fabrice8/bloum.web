@@ -1,0 +1,33 @@
+
+
+<div.chat-thread>
+  <div.font-small-2.text-muted.pt-1.pb-3>
+    ${input.total} <Locale text="Reply"/>
+  </div>
+
+  <ul.list-unstyled style="margin:.2rem 0 0 0">
+    $ let previousSender
+    <for|chat, index| of=input.list>
+      <li.py-25.d-flex.align-items-start>
+        <if( previousSender !== chat.sender )>
+          $ previousSender = chat.sender
+
+          <context|{}, emit| from="ContextBody">
+            <div.chat-avatar.float-left on-click( emit, 'show-profile', chat.id )>
+              <a.avatar.m-0>
+                <Image.avatar-image src=(chat.photo || '/images/default/user.png')/>
+              </a>
+            </div>
+          </context>
+        </if>
+        <else><span.avatar-image></span></else>
+
+        <div.w-100>
+          <Message ...chat
+                    on-action( ( ...args ) => component.emit('action', ...args ) )
+                    on-show-options( () => component.emit('show-options') )/>
+        </div>
+      </li>
+    </for>
+  </ul>
+</div>

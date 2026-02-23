@@ -1,0 +1,538 @@
+
+static let isDoingTimer = 0
+static const hiddenList = [] // Temporary
+
+class {
+  onCreate({ App, context, profile }){
+
+    // Use micro-app notification feature
+    App.extend( this, ['Notification'] )
+    
+    this.state = {
+      active: context,
+      communities: null,
+      groups: null,
+      DMs: null,
+      
+      // None viewed notification badges
+      badges: this.App.UIStore.get('badges') || {},
+      // List of hidden contexts
+      hiddens: this.App.UIStore.get('hidden-contexts') || []
+    }
+    
+    // List of all active context in userspace
+    this.allContexts = {}
+  }
+  onInput({ context }){
+    debugLog('Sidebar `onInput` entry')
+    debugLog('No Context: ', !context || !context.id )
+
+    if( !context || !context.id ) return
+
+    // Add new context to sidebar: Community, Group, DM, ...
+    if( this.state[ context.type +'s']
+        && !this.state[ context.type +'s'].hasOwnProperty( context.id ) ){
+      debugLog('Context Does not exist yet')
+      this.state[ context.type +'s'][ context.id ] = context
+      
+      // Do not display hidden contexts
+      this[ context.hidden ? 'onHideContext' : 'onShowContext' ]( context.id )
+      
+      // Add its notification event listeners
+      this.once( 'update', () => {
+        this.listeners( context.type, context.id )
+        debugLog('Chat Listeners are Up ...')
+      } )
+    }
+
+    debugLog('Context is Hidden: ', this.state.hiddens.includes( context.id ) )
+    
+    // Ignore hidden contexts
+    if( this.state.hiddens.includes( context.id ) ) return
+
+    debugLog('Context is Made active')
+    
+    // Highlight as active context
+    this.state.active = context
+    // Remove badges
+    delete this.state.badges[ context.id ]
+    this.App.UIStore.set( 'badges', this.state.badges )
+  }
+  onMount(){ this.onFetchAll() }
+  onNofify( type, contextId, { message, title } ){
+
+    debugLog('Check context visibility: ', this.state.hiddens )
+    // Show context if hidden
+    this.onShowContext( contextId )
+    
+    // Display new chat message as label
+    debugLog('Show context message label: ', message )
+    if( message ){
+      this.state[ type +'s'][ contextId ].message = message
+      this.App.Notification.show( message )
+    }
+    // Increase number of post label
+    if( title ){
+      this.state[ type +'s'][ contextId ].totalPosts++
+      this.App.Notification.bell()
+    }
+
+    debugLog('isActive Context: ', this.state.active.id == contextId )
+    /* In case this context isn't the active one
+      then display notification badge
+    */
+    if( this.state.active.id == contextId ) return
+    this.state.badges[ contextId ] = this.state.badges[ contextId ] ? this.state.badges[ contextId ] + 1 : 1
+    
+    this.setStateDirty( type +'s')
+    this.setStateDirty('badges')
+    this.App.UIStore.set( 'badges', this.state.badges )
+    
+    debugLog('Display and store Notification badges changes: ', this.state.badges )
+  }
+  onHideContext( contextId ){
+    // Hide a context
+    if( this.state.hiddens.includes( contextId ) ) return
+
+    this.state.hiddens.push( contextId )
+    this.setStateDirty('hiddens')
+
+    this.App.UIStore.set( 'hidden-contexts', this.state.hiddens )
+
+    // Fallback to initial mode when this context was the active one
+    if( this.state.active.id == contextId ){
+      this.emit('open', false )
+      this.state.active = {}
+    }
+  }
+  onShowContext( contextId ){
+    // Make a context visible
+    this.state.hiddens = this.state.hiddens.filter( each => { return each !== contextId } )
+
+    this.setStateDirty('hiddens')
+    this.App.UIStore.set( 'hidden-contexts', this.state.hiddens )
+  }
+  listeners( type, contextId ){
+
+    switch( type ){
+      case 'DM': this.input.Connect
+                    .channel( 'DM', contextId )
+                    // New message received in this DM
+                    .on( 'CHAT_NEW', chat => {
+
+                      // Feedback event of my message being delivered
+                      if( chat.sender == this.input.profile.id ){
+                        debugLog('Feedback Confirmation Event of `Message sent`')
+                        return
+                      }
+                      
+                      // Message from other peer
+                      debugLog('Got new message')
+                      this.onNofify( 'DM', contextId, chat )
+                    } )
+                    // Display user DO-ING indicator: Typing, Recording, ...
+                    .on( 'DO_ING', ({ id, type }) => {
+                      // Display for only unactive contexts
+                      if( this.state.active.id == contextId ) return
+
+                      this.state.DMs[ contextId ].doing = `<small>${type.toCapitalCase()}...</small>`
+                      this.setStateDirty('DMs')
+                
+                      clearTimeout( isDoingTimer )
+                      isDoingTimer = setTimeout( () => {
+                        this.state.DMs[ contextId ].doing = false
+                        this.setStateDirty('DMs')
+                      }, 2000 )
+                    } )
+          break
+      case 'group': this.input.Connect
+                    .channel( 'group', contextId )
+                    // New message received in this Group
+                    .on( 'CHAT_NEW', chat => this.onNofify( 'group', contextId, chat ) )
+          break
+      case 'community': this.input.Connect
+                    .channel( 'community', contextId )
+                    // New post created in this community
+                    .on( 'POST_NEW', post => this.onNofify( 'community', contextId, post ) )
+                    // New comment in this community
+                    .on( 'COMMENT_NEW', comment => this.onNofify( 'community', contextId, comment ) )
+          break
+    }
+  }
+  
+  async onFetchAll(){
+    // Fetch communities
+    try {
+      const
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, communities } = await this.App.Request(`${this.App.data.baseURL}/community/list`, payload )
+      if( error ) throw new Error( message )
+      
+      this.state.communities = {}
+      communities.map( community => {
+        const 
+        { communityId, logo, name, totalPosts, members, tags } = community,
+        context = {
+          id: communityId,
+          logo,
+          name,
+          tags,
+          members,
+          isPrivate: community.private,
+          totalPosts: totalPosts || 0,
+          memberCount: members ? members.length : 0
+        }
+        
+        // Add to all contexts list: Hidden or not
+        this.allContexts[ communityId ] = context
+        // Listen to events that occured in this community: Post & Comments
+        this.listeners('community', communityId )
+
+        // Already displayed
+        if( this.state.communities.hasOwnProperty( communityId ) ) return
+        
+        this.state.communities[ communityId ] = context
+      } )
+
+      // Send all recorded community contexts to main component
+      this.emit('ready', this.allContexts )
+    }
+    catch( error ){ debugLog('Failed Fetching Communities: ', error ) }
+
+    // Fetch groups
+    try {
+      const 
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, groups } = await this.App.Request(`${this.App.data.baseURL}/group/list`, payload )
+      if( error ) throw new Error( message )
+      
+      this.state.groups = {}
+      groups.map( group => {
+        const 
+        { groupId, logo, name, members } = group,
+        context = {
+          id: groupId,
+          logo,
+          name,
+          members,
+          isPrivate: group.private,
+          memberCount: members ? members.length : 0
+        }
+
+        // Add to all contexts list: Hidden or not
+        this.allContexts[ groupId ] = context
+        // Listen to events that occured in this group: Chat messages
+        this.listeners('group', groupId )
+
+        // Already displayed
+        if( this.state.groups.hasOwnProperty( groupId ) ) return
+
+        this.state.groups[ groupId ] = context
+      } )
+
+      // Send all recorded group contexts to main component
+      this.emit('ready', this.allContexts )
+    }
+    catch( error ){ debugLog('Failed Fetching Groups: ', error ) }
+
+    // Fetch DMs
+    try {
+      const 
+      payload = {
+        method: 'GET',
+        headers: this.App.data.headers
+      },
+      { error, message, DMs } = await this.App.Request(`${this.App.data.baseURL}/DM/list`, payload )
+      if( error ) throw new Error( message )
+      
+      this.state.DMs = {}
+
+      DMs.map( ({ DMId, peers, lastChat }) => {
+
+        let peer
+        for( let x = 0; x < peers.length; x++ )
+          if( peers[x].id !== this.input.profile.id ){
+            peer = peers[x]
+            break
+          }
+        
+        const context = {
+          id: DMId,
+          peerId: peer.id,
+          photo: peer.photo,
+          name: peer.name,
+          message: lastChat && lastChat.message || '',
+          status: peer.status,
+          peers
+        }
+
+        // Add to all contexts list: Hidden or not
+        this.allContexts[ DMId ] = context
+        // Listen to events that occured in this DM: Chat messages
+        this.listeners('DM', DMId )
+
+        // Already displayed
+        if( this.state.DMs.hasOwnProperty( DMId ) ) return
+
+        this.state.DMs[ DMId ] = context
+      } )
+
+      // Send all recorded DM contexts to main component
+      this.emit('ready', this.allContexts )
+    }
+    catch( error ){ debugLog('Failed Fetching DMs: ', error ) }
+  }
+}
+
+<macro name="Loading">
+  <ul.px-2.list-unstyled>
+    <li.my-75.w-100.round.animated-placeholder style="height:20px"></li>
+    <li.my-75.w-75.round.animated-placeholder style="height:20px"></li>
+    <li.my-75.w-50.round.animated-placeholder style="height:20px"></li>
+  </ul>
+</macro>
+
+<macro|{ id, isPrivate, logo, name, totalPosts, memberCount }| name="CommunityLi">
+  <if( !state.hiddens.includes( id ) )>
+    <li.nav-item.cursor-pointer.px-2.py-25 class=( state.active && id == state.active.id ? 'active' : false )>
+      <div.position-relative.d-flex.align-items-center.hover-toggle>
+        <!-- Logo -->
+        <div class="avatar" on-click( () => component.emit('open', 'community', { id }) )>
+          <if( logo )>
+            <Image.avatar-image src=logo alt="logo"/>
+          </if>
+          <else><AvatarContent name=name/></else>
+        </div>
+
+        <!-- New group message notification badge -->
+        <if( state.badges[ id ] > 0 )>
+          <span.position-absolute.top-0.right-0.py-25.hover-hide on-click( () => component.emit('open', 'community', { id }) )>
+            <span.badge.badge-danger.round>${state.badges[ id ]}</span>
+          </span>
+        </if>
+        <!-- Private community -->
+        <else-if( isPrivate )>
+          <span.position-absolute.top-0.right-0.py-1.hover-hide>
+            <Bx.text-muted bxs=true type="lock-alt"/>
+          </span>
+        </else-if>
+
+        <!-- Remove context outline -->
+        <span.position-absolute.top-0.right-0.py-1.hover-show on-click('onHideContext', id )>
+          <Bx.text-muted type="x"/>
+        </span>
+
+        <!-- Captions -->
+        <div.pl-4 on-click( () => component.emit('open', 'community', { id }) )>
+          <h6.font-medium-1.m-0>${name}</h6>
+          <span.font-small-3.text-muted>
+            ${totalPosts} 
+            <Locale text="Posts"/>
+          </span>
+          <span.font-small-3.text-muted.mx-2>
+            <if( isPrivate )>
+              ${memberCount} 
+              <Locale text="Members"/>
+            </if>
+          </span>
+        </div>
+      </div>
+    </li>
+  </if>
+</macro>
+
+<macro|{ id, isPrivate, logo, name, doing }| name="GroupLi">
+  <if( !state.hiddens.includes( id ) )>
+    <li.nav-item.cursor-pointer.px-2 class=( state.active && id == state.active.id ? 'active' : false )>
+      <div.position-relative.d-flex.align-items-center.hover-toggle>
+        <!-- Logo -->
+        <div class="avatar" on-click( () => component.emit('open', 'group', { id }) )>
+          <if( logo )>
+            <Image.avatar-image src=logo alt="logo"/>
+          </if>
+          <else><AvatarContent name=name/></else>
+        </div>
+
+        <!-- New group message notification badge -->
+        <if( state.badges[ id ] > 0 )>
+          <span.position-absolute.top-0.right-0.py-75.hover-hide on-click( () => component.emit('open', 'group', { id }) )>
+            <span.badge.badge-danger.round>${state.badges[ id ]}</span>
+          </span>
+        </if>
+        <!-- Private community -->
+        <else-if( isPrivate )>
+          <span.position-absolute.top-0.right-0.py-1.hover-hide>
+            <Bx.text-muted bxs=true type="lock-alt"/>
+          </span>
+        </else-if>
+
+        <!-- Remove context outline -->
+        <span.position-absolute.top-0.right-0.py-1.hover-show on-click('onHideContext', id )>
+          <Bx.text-muted type="x"/>
+        </span>
+
+        <!-- Captions -->
+        <div.position-relative.w-100.pl-4.py-1 on-click( () => component.emit('open', 'group', { id }) )>
+          <h6.font-medium-1.m-0>${name}</h6>
+
+          <!-- Members activity -->
+          <if( doing )>
+            <div.w-75.text-ellipsis.overflow-hidden>
+              <span.font-small-3.text-muted>$!{doing}</span>
+            </div>
+          </if>
+        </div>
+      </div>
+    </li>
+  </if>
+</macro>
+
+<macro|{ id, peerId, photo, name, message, status, doing }| name="DMLi">
+  <if( !state.hiddens.includes( id ) )>
+    <li.nav-item.cursor-pointer.px-2.py-25 class=( state.active && id == state.active.id ? 'active' : false )>
+      <div.position-relative.d-flex.align-items-center.hover-toggle>
+        <!-- Avatar -->
+        <div class="avatar" on-click( () => component.emit('show-profile', peerId ) )>
+          <if( photo )>
+            <Image.avatar-image src=photo alt="avatar"/>
+          </if>
+          <else><AvatarContent name=name/></else>
+          <if( input.people[ peerId ] )>
+            <span class=`avatar-status-${input.people[ peerId ].status}`></span>
+          </if>
+        </div>
+
+        <!-- New DM message notification badge -->
+        <if( state.badges[ id ] > 0 )>
+          <span.position-absolute.zindex-1.top-0.right-0.py-25.hover-hide on-click( () => component.emit('open', 'DM', { id }) )>
+            <span.badge.badge-danger.round>${state.badges[ id ]}</span>
+          </span>
+        </if>
+
+        <!-- Remove context outline -->
+        <span.position-absolute.zindex-1.top-0.right-0.py-1.hover-show on-click('onHideContext', id )>
+          <Bx.text-muted type="x"/>
+        </span>
+
+        <!-- Captions -->
+        <div.position-relative.w-100.pl-4 on-click( () => component.emit('open', 'DM', { id }) )>
+          <h6.font-medium-1.m-0>${name}</h6>
+
+          <!-- Last message: Sent or Received -->
+          <if( doing || message )>
+            <div.w-75.text-ellipsis.overflow-hidden>
+              <span.font-small-3.text-muted>$!{doing || message}</span>
+            </div>
+          </if>
+        </div>
+      </div>
+    </li>
+  </if>
+</macro>
+
+<AutoScroll.position-relative.zindex-3.theme-bg.w-100.border-right noScrollX height="100vh">
+  <!-- Search & Profile Avatar block -->
+  <div.position-sticky.zindex-1.top-0.w-100.theme-bg.px-1.py-50.border-bottom>
+    <Row.d-flex.align-items-center>
+      <@col>
+        <div class="avatar" on-click( () => component.emit('show-profile', 'me') )>
+          <Image.avatar-image src=( input.profile.photo || '/images/default/user.png' ) 
+                alt="user_avatar"
+                title=input.profile.name/>
+        </div>
+      </@col>
+
+      <@col class="col-8 text-right">
+        <span.cursor-pointer on-click( () => component.emit('search') )>
+          <Bx.font-medium-5 type="search"/>
+        </span>
+      </@col>
+      <!-- <fieldset.position-relative.form-group.has-icon-left.mx-75.mb-0>
+        <input.form-control.round type="text" id="chat-search" placeholder="Search"/>
+        <div.form-control-position>
+          <Bx.text-muted type="search"/>
+        </div>
+      </fieldset> -->
+    </Row>
+  </div>
+
+  <div.py-1>
+    <section.py-50>
+      <ul.list-unstyled.m-0>
+        <!-- People -->
+        <li.nav-item.cursor-pointer.px-2.d-flex.align-items-center
+            on-click( () => component.emit('show-people') )>
+          <Bx.p-75.font-medium-5.text-warning type="group"/>
+          <Locale.font-medium-1.pl-4 text="People"/>
+        </li>
+        <!-- Saved Items -->
+        <li.nav-item.cursor-pointer.px-2.d-flex.align-items-center
+            on-click( () => component.emit('open', { type: 'saved' }) )>
+          <Bx.p-75.font-medium-5.text-secondary type="bookmarks"/>
+          <Locale.font-medium-1.pl-4 text="Saved Items"/>
+        </li>
+      </ul>
+    </section>
+
+    <!-- Communities -->
+    <section>
+      <h6.px-2.py-50>
+        <Locale.font-small-3.text-muted text="Communities"/>
+        <span on-click( () => component.emit('add-community') )>
+          <Bx.float-right.cursor-pointer type="plus"/>
+        </span>
+      </h6>
+      <if( state.communities === null )><Loading/></if>
+      <else>
+        <ul.list-unstyled>
+          <for|id, community| in=state.communities>
+            <CommunityLi key=id ...community/>
+          </for>
+        </ul>
+      </else>
+    </section>
+
+    <!-- Groups -->
+    <section>
+      <h6.px-2.py-50>
+        <Locale.font-small-3.text-muted text="Groups"/>
+        <span on-click( () => component.emit('add-group') )>
+          <Bx.float-right.cursor-pointer type="plus"/>
+        </span>
+      </h6>
+      <if( state.groups === null )><Loading/></if>
+      <else>
+        <ul.list-unstyled>
+          <for|id, group| in=state.groups>
+            <GroupLi key=id ...group/>
+          </for>
+        </ul>
+      </else>
+    </section>
+
+    <!-- Direct Messages -->
+    <section>
+      <h6.px-2.py-50>
+        <Locale.font-small-3.text-muted text="Direct Messages"/>
+        <span on-click( () => component.emit('show-people') )>
+          <Bx.float-right.cursor-pointer type="plus"/>
+        </span>
+      </h6>
+
+      <if( state.DMs === null )><Loading/></if>
+      <else>
+        <ul.list-unstyled>
+          <for|id, DM| in=state.DMs>
+            <DMLi key=id ...DM/>
+          </for>
+        </ul>
+      </else>
+    </section>
+  </div>
+</AutoScroll>

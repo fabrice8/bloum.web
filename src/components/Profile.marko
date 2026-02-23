@@ -1,0 +1,55 @@
+
+<div.position-absolute.zindex-4.w-100.vh-100.top-0.theme-bg.slideInLeft.fast class=( !input.static ? 'animated border-right' : 'border-left')>
+  <header.text-center.border-bottom>
+    <if( !input.static )>
+      <span.position-absolute.m-2.top-0.right-0.cursor-pointer on-click( () => component.emit('dismiss') )>
+        <Bx.font-medium-5 type="x"/>
+      </span>
+    </if>
+
+    <div class="my-2">
+      <div class="avatar">
+        <img src=( input.profile.photo || '/images/default/user.png') alt="user_avatar" style="width:100px;height:100px;">
+      </div>
+
+      <h5.mb-0.font-medium-3>${input.profile.name}</h5>
+      <!-- <span>Designer</span> -->
+    </div>
+  </header>
+
+  <if( input.profile.display )>
+    $ const { phone, email, country, status, titles } = input.profile.display
+    <div.py-1>
+      <if( status )>
+        <section.px-2.py-25>
+          <h6.font-small-3.text-muted.py-50>Status</h6>
+          <p class="mb-2">${status}</p>
+        </section>
+      </if>
+      
+      <section.px-2.py-25>
+        <h6.font-small-3.text-muted.py-50>Personal</h6>
+        <ul class="list-unstyled mb-2">
+          <if( email )><li.my-25>${email}</li></if>
+          <if( phone )><li.my-25>${phone}</li></if>
+          <if( country )><li.my-25>${country.city}, ${country.country_name}</li></if>
+        </ul>
+      </section>
+
+      <if( titles )>
+        <section.px-2.py-25>
+          <h6.font-small-3.text-muted.py-50>Groups</h6>
+          <ul class="list-unstyled mb-2">
+            <li><a href="javascript:void(0);"># Devlopers</a></li>
+            <li><a href="javascript:void(0);"># Designers</a></li>
+          </ul>
+        </section>
+      </if>
+      
+      <!-- Social medias -->
+      
+
+      
+    </div>
+  </if>
+</div>

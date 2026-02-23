@@ -1,0 +1,76 @@
+
+<section.border-top.py-1>
+  <div style="margin-left:5rem">
+    <!-- Closed post status -->
+    <span.float-left style="margin-left:-3rem">
+      <Bx.font-large-1.p-50.text-info.border.rounded-circle type="lock-alt"/>
+    </span>
+
+    <div.status.px-2>
+      <Row>
+        <!-- Closing reason -->
+        <@col>
+          <div>
+            <p.font-small-3.text-muted.mb-50>
+              No more activity recorded on this post. For 
+              currently active related thread to <a href="#e3932">#e3932</a>
+            </p>
+            <span.badge.badge-info.round>
+              <Locale text="Closed"/>
+            </span>
+          </div>
+        </@col>
+        <!-- Author info -->
+        <@col.col-5>
+          <div.d-flex.align-items-center>
+            <div class="avatar">
+              <Image.avatar-image src=(photo || '/images/default/user.png') alt="avatar"/>
+            </div>
+            <div.w-100.pl-4>
+              <h6.font-medium-1.my-0>Kadala Piarou</h6>
+              <span.font-small-3.text-muted>January 22, 1029</span>
+            </div>
+          </div>
+        </@col>
+      </Row>
+    </div>
+  </div>
+</section>
+
+<section.py-1>
+  <div style="margin-left:5rem">
+    <!-- Open or Reopen post status -->
+    <span.float-left style="margin-left:-3rem">
+      <Bx.font-large-1.p-50.text-success.border.rounded-circle type="lock-open-alt"/>
+    </span>
+
+    <div.status.px-2>
+      <Row>
+        <!-- Open Reason -->
+        <@col>
+          <div>
+            <p.font-small-3.text-muted.mb-50>
+              A lot of thread refering to this post <a href="#e3932">#e3932</a>
+              trigger concerns.
+            </p>
+            <span.badge.badge-success.round>
+              <Locale text="Open"/>
+            </span>
+          </div>
+        </@col>
+        <!-- Author info -->
+        <@col.col-5>
+          <div.d-flex.align-items-center>
+            <div class="avatar">
+              <Image.avatar-image src=(photo || '/images/default/user.png') alt="avatar"/>
+            </div>
+            <div.w-100.pl-4>
+              <h6.font-medium-1.my-0>Kadala Piarou</h6>
+              <span.font-small-3.text-muted>January 22, 1029</span>
+            </div>
+          </div>
+        </@col>
+      </Row>
+    </div>
+  </div>
+</section>

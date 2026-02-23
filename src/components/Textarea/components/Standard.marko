@@ -1,0 +1,125 @@
+
+import Markdown from '../markdown'
+
+static const ParseMarkdownList = [ 'bold', 'italic', 'strikethrough', 'inline-code' ]
+static const PreventKeyCodes = [ 13 ]
+
+class {
+  onCreate(){ this.state = { content: '' } }
+  onInput({ action }){
+    if( !action ) return
+
+    switch( action.type ){
+      case 'edit': this.state.content = action.dataset[ this.input.type ]; break
+    }
+  }
+  onMount(){ this.editable = this.getEl('editable') }
+  onKeyUp(e){ e.keyCode == 13 && this.onEnter() }
+  onKeyDown(e){
+    if( PreventKeyCodes.includes( e.keyCode ) ) 
+      e.preventDefault()
+  }
+  onEntry(e){
+    // Parse Markdown Properties
+    const { HTML, cursorPosition } = Markdown( e.target.innerHTML, ParseMarkdownList )
+
+    this.state.content = HTML
+    this.emit('event', 'input', HTML, e )
+
+    this.once( 'update', () => {
+      cursorPosition !== undefined && this.setCursor( cursorPosition ) // Reset the cursor
+      $(this.editable).find('.cursor').removeAttr('class')
+    } )
+  }
+  onEnter(){
+    const _event = ['edit'].includes( this.input.action.type ) ? 'apply' : 'enter'
+    this.emit( _event, this.state.content, this.onAcknowledge.bind(this) )
+  }
+  onAcknowledge(){ this.state.content = '' }
+  setCursor( position ){
+    const
+    range = document.createRange(), // Creates range object
+    set = window.getSelection() // Creates object for selection
+    
+    // Set start position of range
+    range.setStart( $(this.editable).find('.cursor')[0], position )
+    // Collapse range within its boundary points
+    // Returns boolean
+    range.collapse(true)
+    // Remove all ranges set
+    set.removeAllRanges()
+    // Add range with respect to range object.
+    set.addRange( range )
+    // Set cursor on focus
+    this.editable.focus()
+
+    $(this.editable).find('.cursor').removeAttr('class')
+  }
+  appendAssets( assets ){
+
+    console.log('Assets: ', assets )
+  }
+}
+
+<div.position-relative.d-flex.align-items-end.px-50>
+  <!-- Add Emodjis -->
+  <span.cursor-pointer.px-50.py-50
+        on-click( () => component.emit('event', 'emoji', component.appendAssets.bind(component) ) )>
+    <Bx.font-medium-4 type="face"/>
+  </span>
+  <!-- Attach Media -->
+  <span.cursor-pointer.px-50.py-50
+        on-click( () => component.emit('event', 'attach') )>
+    <Bx.font-medium-4 type="paperclip"/>
+  </span>
+  
+  <!-- Textarea -->
+  <div.w-100.mx-75.rounded>
+    <!-- Mounted action indicators & Controls -->
+    <if( !isEmpty( input.action ) )>
+      <Switch by=input.action.type>
+        <@case is="edit">
+          <button.btn.btn-outline-secondary.round.btn-sm.m-50 on-click( () => component.emit('event', 'cancel-action') )>
+            <Locale text="Cancel"/>
+          </button>
+        </@case>
+        <@case is="reply">
+          <div.position-relative.px-1>
+            <!-- Sender of the chat -->
+            <h5.font-small-3.text-muted>${input.action.dataset.name}</h5>
+            <!-- Dismiss reply -->
+            <span.position-absolute.right-0.top-0.cursor-pointer on-click( () => component.emit('event', 'cancel-action') )>
+              <Bx.font-medium-5.px-50 type="x"/>
+            </span>
+            <!-- text content -->
+            <p.font-small-3>$!{input.action.dataset[ input.type ]}</p>
+          </div>
+        </@case>
+      </Switch>
+    </if>
+
+    <div.standard.position-relative.bottom-0.form-control.border-none.py-75.font-small-4.overflow-auto
+        key="editable"
+        contenteditable
+        placeholder=input.placeholder
+        on-input('onEntry')
+        on-keyup('onKeyUp')
+        on-keydown('onKeyDown')>$!{state.content}</div>
+  </div>
+  
+  <Switch by=input.action.type>
+    <!-- Apply previously mounted action changes button -->
+    <@case is="edit">
+      <span.cursor-pointer.py-25 title=Locale('Apply Change') on-click('onEnter')>
+        <Bx.font-large-1 type="check"/>
+      </span>
+    </@case>
+    
+    <!-- Send button -->
+    <@default>
+      <span.cursor-pointer.py-25 title=Locale('Send Message') on-click('onEnter')>
+        <Bx.font-large-1 class=( !input.hasMedias && !state.content ? 'text-muted cursor-not-allowed' : false ) type="send"/>
+      </span>
+    </@default>
+  </Switch>
+</div>

@@ -1,0 +1,137 @@
+
+
+import Quill from 'quill'
+import 'quill/dist/quill.snow.css'
+
+class {
+  onCreate(){ 
+    this.state = { content: '' }
+    this.previousValue = ''
+  }
+  onInput({ type, action }){
+    // When input changes
+    if( !action || action.dataset && action.dataset[ type ] == this.previousValue ) 
+      return
+    
+    // Overwrite active editor content with new delta input
+    if( this.editor )
+      switch( action.type ){
+        case 'edit': this.editor.setContents( this.editor.clipboard.convert( action.dataset[ type ] ), 'silent' ); break // Text input value
+      }
+  }
+  onMount(){ this.initialize() }
+
+  initialize(){
+    const editorElement = this.getEl('q-text-area')
+    this.editor = new Quill( editorElement, {
+                                              debug: 'warn',
+                                              placeholder: this.input.placeholder,
+                                              theme: 'snow',
+                                              modules: {
+                                                toolbar: this.getEl('q-editor-toolbar'),
+                                                // handlers: {}
+                                              }
+                                            } )
+                                            
+    const $editor = $(editorElement)
+    .find('[contenteditable]')
+    // .on( 'focus', () => this.emit('focus') )
+    .on( 'keyup', () => {
+      this.state.content = $editor.html()
+      this.emit( 'event', 'input', this.state.content, editorElement )
+    })
+  }
+  onEnter(){
+    const _event = ['edit'].includes( this.input.action.type ) ? 'apply' : 'enter'
+    this.emit( _event, this.state.content, this.onAcknowledge.bind(this) )
+  }
+  onAcknowledge(){ this.editor.setText( this.state.content = '', 'api' ) }
+  appendAssets( assets ){
+
+    console.log('Assets: ', assets )
+  }
+}
+
+<div.position-relative.rounded.m-25>
+  <!-- Mounted action indicators & Controls -->
+  <if( !isEmpty( input.action ) )>
+    <div.position-relative.zindex-2.px-1>
+      <Switch by=input.action.type>
+        <@case is="edit">
+          <button.btn.btn-outline-secondary.round.btn-sm.my-50 on-click( () => component.emit('event', 'cancel-action') )>
+            <Locale text="Cancel"/>
+          </button>
+        </@case>
+        <@case is="reply">
+          <!-- Sender of the chat/comment -->
+          <h5.font-small-3.text-muted>${input.action.dataset.name}</h5>
+          <!-- Dismiss reply -->
+          <span.position-absolute.right-0.top-0.cursor-pointer on-click( () => component.emit('event', 'cancel-action') )>
+            <Bx.font-medium-5.px-50 type="x"/>
+          </span>
+          <!-- text content -->
+          <p.font-small-3>$!{input.action.dataset[ input.type ]}</p>
+        </@case>
+      </Switch>
+    </div>
+  </if>
+  
+  <!-- Textarea -->
+  <div.position-relative.bottom-0.overflow-auto
+      key="q-text-area"
+      no-update
+      placeholder=input.placeholder>$!{state.content}</div>
+  
+  <!-- Editor Toolbar -->
+  <Row key="q-editor-toolbar">
+    <@col.col.pl-50>
+      <ul.q-ul class="list-inline m-0 d-flex align-items-center">
+        <li>
+          <!-- Add a bold button -->
+          <button class="ql-bold"></button>
+          <!-- Add a italic button -->
+          <button class="ql-italic"></button>
+          <!-- Add a strike button -->
+          <button class="ql-strike"></button>
+          <!-- Add a buulet & ordered list button -->
+          <button class="ql-list" value="bullet"></button>
+          <button class="ql-list" value="ordered"></button>
+          <!-- Add a blockquote & code-block button -->
+          <button class="ql-blockquote"></button>
+          <button class="ql-code-block"></button>
+          <!-- Add Attach element buttons -->
+          <button class="ql-link"></button>
+          <button class="ql-formula"></button>
+        </li>
+      </ul>
+    </@col>
+    <@col.col-4.text-right>
+      <!-- Display Emodjis -->
+      <span.cursor-pointer.px-50
+            on-click( () => component.emit('event', 'emoji', component.appendAssets.bind(component) ) )>
+        <Bx.font-medium-4 type="face"/>
+      </span>
+      <!-- Attach Media -->
+      <span.cursor-pointer.px-50
+            on-click( () => component.emit('event', 'attach') )>
+        <Bx.font-medium-4 type="paperclip"/>
+      </span>
+      
+      <Switch by=input.action.type>
+        <!-- Apply previously mounted action changes button -->
+        <@case is="edit">
+          <span.cursor-pointer.px-50 title=Locale('Apply Change') on-click('onEnter')>
+            <Bx.font-medium-4 type="check"/>
+          </span>
+        </@case>
+        
+        <!-- Send button -->
+        <@default>
+          <span.cursor-pointer.px-50 title=Locale('Send Message') on-click('onEnter')>
+            <Bx.font-medium-4 class=( !input.hasMedias && !state.content ? 'text-muted cursor-not-allowed' : false ) type="send"/>
+          </span>
+        </@default>
+      </Switch>
+    </@col>
+  </Row>
+</div>

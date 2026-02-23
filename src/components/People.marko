@@ -1,0 +1,35 @@
+
+<div.d-flex.align-items-center>
+  <if( input.checkbox )>
+    <div class="checkbox checkbox-secondary">
+      <input type="checkbox"
+              no-update
+              id=input.id
+              on-change( e => component.emit( 'select', e.target.checked ) )/>
+      <label for=input.id class="font-medium-1"></label>
+    </div>
+  </if>
+
+  <div class="avatar" on-click( () => component.emit('toggle') )>
+    <if( input.photo )>
+      <Image.avatar-image src=input.photo alt="avatar"/>
+    </if>
+    <else><AvatarContent name=input.name/></else>
+    <if( input.status )>
+      <span class=`avatar-status-${input.status}`></span>
+    </if>
+  </div>
+
+  <div.position-relative.w-100.px-1 on-click( () => component.emit('toggle') )>
+    <if( input.role && input.isAdmin )>
+      <Locale.px-1.py-25.border.round.float-right.font-small-2 text="Admin"/>
+    </if>
+    <h6.font-medium-1.m-0>${input.name}</h6>
+
+    <if( input.id && !input.id.includes('GEN::') )>
+      <div.w-75.text-ellipsis.overflow-hidden>
+        <span.font-small-2.text-muted>${input.id}</span>
+      </div>
+    </if>
+  </div>
+</div>

@@ -1,0 +1,23 @@
+
+<div.position-absolute.zindex-4.top-0.w-100.vh-100.theme-bg-transparent>
+  <div.px-3>
+    <span.position-absolute.top-0.right-0.p-2 on-click( () => component.emit('dismiss') )>
+      <Bx.font-large-1 type="x"/>
+    </span>
+    
+    <h5.py-75.font-medium-3><Locale text="Members"/></h5>
+    <br>
+    <ul.list-unstyled>
+      <for|people, index| of=input.options.members>
+        <li.nav-item.cursor-pointer.py-50.rounded>
+          <People ...people role=true on-toggle('')/>
+        </li>
+      </for>
+    </ul>
+
+    <br>
+    <button.btn.btn-secondary on-click( () => component.emit('add') )>
+      <Locale text="Add Member"/>
+    </button>
+  </div>
+</div>

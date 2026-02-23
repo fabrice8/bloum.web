@@ -1,0 +1,151 @@
+
+import FormHandler from 'markojs-form'
+
+class {
+  onCreate({ App }){
+    this.state = { submitting: false }
+
+    App.extend(this)
+
+    this.fhandler = new FormHandler({ key: 'create-forum', autosave: true, crosscheck: true })
+    this.fhandler.bind(this, { private: false })
+  }
+  
+  onReset(){ this.fhandler.reset() }
+  async onSubmit(){
+    
+    if( !isEmpty( this.state.formError ) 
+        && Object.values( this.state.formError ).includes( true ) ) return
+
+    const Form = this.state.form
+
+    if( !Form.name )
+      return this.fhandler.error('name', true )
+
+    if( Form.categories )
+      Form.categories = Form.categories.split(/\s*,\s*/g)
+    
+    // Create forum in the scope of current space
+    Form.spaceId = this.input.spaceId
+    
+    this.state.submitting = true
+    try {
+      const
+      payload = {
+        method: 'POST',
+        headers: this.App.data.headers,
+        body: Form
+      },
+      { error, message, forumId } = await this.App.Request(`${this.App.data.baseURL}/forum/create`, payload )
+      if( error ) throw new Error( message )
+
+      this.fhandler.reset()
+      this.fhandler.alert( message )
+      this.emit( 'done', { id: forumId } )
+      
+      this.state.submitting = false
+      setTimeout( () => this.emit('dismiss'), 2000 )
+    }
+    catch( error ){ 
+      debugLog('Failed Creating Forum: ', error )
+      this.state.submitting = false
+    }
+  }
+}
+
+<div.position-absolute.zindex-4.top-0.w-100.vh-100.theme-bg-transparent.d-flex.align-items-center.justify-content-center>
+  <div.w-75>
+    <span.position-absolute.top-0.right-0.p-2 on-click( () => component.emit('dismiss') )>
+      <Bx.font-large-1 type="x"/>
+    </span>
+
+    <h5><Locale text="Create a Forum"/></h5>
+    <p>
+      <Locale>
+        Forums are where your people share and discuss posts of any kind. They’re best when organized around a topic — Eg. #program, #course.
+      </Locale>
+    </p>
+    <br>
+    <form key="create-forum">
+      <div.form-group>
+        <label><Locale text="Name"/></label>
+        <div class="form-group">
+          <input type="text"
+                  value=state.form.name
+                  name="name"
+                  class=( 'form-control form-control-lg px-2'+( state.formError.name != undefined ? ( state.formError.name ? ' is-invalid' : ' is-valid' ) : '' ) )
+                  validate="required"
+                  placeholder=( Locale('Name*') )
+                  on-change('__onChange')>
+          <p class=( 'small mt-50 mb-2'+( !state.formError.name ? ' d-none' : '' ) )>
+            <Locale.text-warning text="Name of the forum"/>
+          </p>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label><Locale text="Description"/></label>
+        <textarea type="text"
+                  value=state.form.description
+                  name="description"
+                  class=`form-control form-control-lg px-2 ${state.formError.description != null ? ( state.formError.description ? ' is-invalid' : ' is-valid' ) : ''}`
+                  placeholder=Locale('Description')
+                  style={ height: '100px', resize: 'none' }
+                  on-change('__onChange')></textarea>
+      </div>
+
+      <!-- Categories -->
+      <div.form-group>
+        <label><Locale text="Categories"/></label>
+        <input.form-control.form-control-lg.px-2
+              type="text"
+              name="categories"
+              value=( Array.isArray( state.form.categories ) ? state.form.categories.join(', ') : state.form.categories )
+              class=( state.formError.categories != null ? ( state.formError.categories ? ' is-invalid' : ' is-valid' ) : '' )
+              placeholder=Locale('Categories')
+              on-change('__onChange')/>
+        <p.font-small-3.text-muted.py-50>
+          <Locale>Enter topics of the forum with comma (,) seperate to help search and discover it easily.</Locale>
+        </p>
+      </div>
+
+      <!-- Private forum -->
+      <br>
+      <div class="mb-1">
+        <div class="checkbox checkbox-secondary">
+          <input type="checkbox"
+                  no-update
+                  id="private"
+                  name="private"
+                  checked=state.form.private
+                  on-change('__onChecked')/>
+          <label for="private" class="font-medium-1">
+            <Locale>Private Forum</Locale>
+            <br>
+            <p.font-small-3.text-muted>
+              <Locale>When a forum is set to private, it can only be viewed or joined by invitation.</Locale>
+            </p>
+          </label>
+        </div>
+      </div>
+
+      <br>
+      <FormAlert alert=state.alert/>
+      
+      <div.text-right>
+        <button.btn.btn-secondary.btn-lg.mx-50
+          type="reset"
+          on-click('onReset')>
+          <Locale text="Cancel"/>
+        </button>
+        <button.btn.btn-primary.btn-lg.mx-50
+                type="submit"
+                on-click('onSubmit')>
+          <Locale text="Create"/>
+          <Preloader.pl-2.font-medium-4.float-right active=state.submitting/>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,139 @@
+
+class {
+  onCreate(){
+    this.state = {
+      medias: [],
+      showAssets: false
+    }
+
+    this.returnAccess = null
+  }
+  onEvent( _event, ...args ){
+    
+    switch( _event ){
+      case 'emoji': if( this.state.showAssets == 'emoji' ) return
+                      this.state.showAssets = 'emoji'
+                      this.returnAccess = args[0] // callback function
+        break
+      case 'attach': this.getEl('mono-select').click(); break
+      default: this.emit( _event, ...args )
+    }
+  }
+  onEnter( value, ack ){
+
+    if( !value && !this.state.medias.length ) return
+
+    this.emit('press-enter', 
+              { [ this.input.type ]: value, medias: this.state.medias }, 
+              (function(){
+                // Clear attached medias
+                this.state.medias = []
+                // Call editor acknowledge callback
+                typeof ack == 'function' & ack()
+              }).bind(this) )
+  }
+  onApply( changes, ack ){
+
+    if( !this.input.action.type
+        || ( this.input.action.type == 'edit' && !changes ) ) return
+    
+    this.emit('action-change', changes, ack )
+  }
+  onDismissAssets(){ this.state.showAssets = false }
+
+  prevenAutoSubmit( e ){ e.preventDefault() }
+  onSelectFiles( e ){
+
+    const files = $(e.target)[0].files
+
+    if( !files || !files.length ) return
+    Array.from( files ).map( file => {
+      this.state.medias.push({
+        raw: file,
+        type: file.type,
+        source: URL.createObjectURL( file ),
+        size: file.size
+      })
+    } )
+
+    this.setStateDirty('medias')
+  }
+  onRemoveMedia( index ){
+    this.state.medias.splice( index, 1 )
+    this.setStateDirty('medias')
+  }
+}
+
+<div.textarea.position-sticky.w-100.bottom-0.px-1.animated.slideInUp.faster>
+  <div.textarea-container.theme-bg.shadow-lg.border>
+    <!-- Medias ready to send -->
+    <if( state.medias.length )>
+      <ul.preview-medias.list-inline.d-inline-flex.align-items-center 
+          style="height:120px;overflow-x:auto;overflow-y:hidden;white-space:nowrap;">
+        <for|media, index| of=state.medias>
+          $ console.log( media.type )
+          <li.position-relative.p-50.hover-toggle key=index style="max-width:100px">
+            <!-- Remove selected media -->
+            <span.hover-show.position-absolute.right-0.top-0.m-50.shadow-lg
+                  on-click('onRemoveMedia', index )>
+              <Bx.font-medium-5.p-25.theme-bg.rounded type="x"/>
+            </span>
+
+            <!-- Display media by mime type -->
+            $ const [ type, extension ] = media.type.split('/')
+            <Switch by=type>
+              <@case is="image">
+                <img.img-fluid.rounded.border src=media.source />
+              </@case>
+              <@case is="video">
+                <video.img-fluid.rounded.border controls="false" src=media.source></video>
+              </@case>
+              <@case is="audio">
+                <audio.img-fluid.rounded.border controls="false" src=media.source></audio>
+              </@case>
+              <@case is=['text', 'application']>
+                <img.img-fluid.rounded.border src=`/images/mime_types/${extension}.png`/>
+              </@case>
+            </Switch>
+          </li>
+        </for>
+      </ul>
+    </if>
+
+    <!-- Textarea -->
+    <Switch by=input.mode>
+      <@case is="advanced">
+        <Advanced type=input.type
+                  action=input.action
+                  placeholder=input.placeholder
+                  hasMedias=state.medias.length
+                  on-event('onEvent')
+                  on-enter('onEnter')
+                  on-apply('onApply')/>
+      </@case>
+      <@default>
+        <Standard type=input.type
+                  action=input.action
+                  placeholder=input.placeholder
+                  hasMedias=state.medias.length
+                  on-event('onEvent')
+                  on-enter('onEnter')
+                  on-apply('onApply')/>
+      </@default>
+    </Switch>
+
+    <!-- Other Assets: Emodji, files, ... -->
+    <if( state.showAssets )>
+      <Assets type=state.showAssets
+              on-dismiss('onDismissAssets')/>
+    </if>
+  </div>
+</div>
+
+<input key="mono-select"
+        type="file"
+        multiple
+        accept="*"
+        style="display:none"
+        on-change('onSelectFiles')
+        on-submit('prevenAutoSubmit')/>

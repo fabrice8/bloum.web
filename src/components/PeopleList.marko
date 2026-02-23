@@ -1,0 +1,62 @@
+
+$ function openDM( people ){
+  component.emit('open', 'DM', people )
+  component.emit('dismiss')
+}
+
+<macro|people| name="PeopleLi">
+  <!-- Ignore this user -->
+  <if( people.id !== input.profile.id )>
+    <li.nav-item.cursor-pointer.px-2.py-50>
+      <People ...people on-toggle( openDM, people )/>
+    </li>
+  </if>
+</macro>
+
+<div.position-absolute.zindex-4.w-100.vh-100.top-0.theme-bg.animated.slideInLeft.fast.border-right>
+  <header.position-sticky.zindex-1.top-0.w-100.theme-bg.px-1.py-50.border-bottom>
+    <Row.d-flex.align-items-center>
+      <@col>
+        <div class="avatar" on-click( () => component.emit('show-profile') )>
+          <Image.avatar-image src="/images/default/user.png" alt="user_avatar"/>
+        </div>
+      </@col>
+
+      <@col class="col-8 text-right">
+        <span.cursor-pointer.px-50 on-click( () => component.emit('search') )>
+          <Bx.font-medium-5 type="search"/>
+        </span>
+        <span.cursor-pointer.px-50 on-click( () => component.emit('dismiss') )>
+          <Bx.font-medium-5 type="x"/>
+        </span>
+      </@col>
+    </Row>
+  </header>
+
+  <div.py-2>
+    <section.py-50>
+      <ul.list-unstyled.m-0>
+        <!-- People -->
+        <li.nav-item.cursor-pointer.px-2.d-flex.align-items-center
+            on-click( () => component.emit('open', { type: 'add-people' }) )>
+          <Bx.p-75.font-medium-5.text-success type="plus"/>
+          <Locale.font-medium-1.pl-4 text="Add people"/>
+        </li>
+        <!-- Saved Items -->
+        <li.nav-item.cursor-pointer.px-2.d-flex.align-items-center
+            on-click( () => component.emit('refresh') )>
+          <Bx.p-75.font-medium-5.text-info type="refresh"/>
+          <Locale.font-medium-1.pl-4 text="Refresh List"/>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <ul.list-unstyled>
+        <for|id, each| in=input.list>
+          <PeopleLi ...each/>
+        </for>
+      </ul>
+    </section>
+  </div>
+</div>

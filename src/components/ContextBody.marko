@@ -1,0 +1,75 @@
+
+
+class {
+  onCreate(){
+    this.state = { active: {} }
+
+    this.noChange = false
+    this.Actives = {}
+  }
+  onInput({ active }){
+
+    // Do not mount hidden context
+    if( active.hidden ) return
+
+    if( this.state.active.id == active.id ) return
+    if( this.Actives.hasOwnProperty( active.id ) ){
+      this.noChange = false
+      this.state.active = active
+    }
+    else {
+      this.Actives[ active.id ] = active
+      this.state.active = active
+    }
+  }
+}
+
+<macro|context| name="Context">
+  <div.position-absolute.h-100.w-100.top-0.left-0.right-0.theme-bg-fade.animated.fadeIn.faster
+      class=(state.active.id == context.id ? 'zindex-2' : 'zindex-1')>
+    <Switch by=context.type>
+      <@case is="DM">
+        <DMContext ...context
+                    App=input.App
+                    Connect=input.Connect
+                    wsmode=input.wsmode
+                    tenant=input.tenant
+                    profile=input.profile/>
+      </@case>
+      <@case is="group">
+        <GroupContext ...context
+                      App=input.App
+                      Connect=input.Connect
+                      wsmode=input.wsmode
+                      tenant=input.tenant
+                      profile=input.profile
+                      people=input.people/>
+      </@case>
+      <@case is="community">
+        <CommunityContext ...context
+                      App=input.App
+                      Connect=input.Connect
+                      wsmode=input.wsmode
+                      tenant=input.tenant
+                      profile=input.profile
+                      people=input.people/>
+      </@case>
+      
+      <@default>
+        <StartContext on-start('onOpen', null )/>
+      </@default>
+    </Switch>
+  </div>
+</macro>
+
+<context on-show-sidebar( () => component.emit('show-sidebar') )
+          on-show-profile( peopleId => component.emit('show-profile', peopleId ) )
+          on-add-member( ( context, id, members ) => component.emit('modal', { type: 'add-member', context, id, members } ) )
+          on-view-members( ( context, id, members ) => component.emit('modal', { type: 'view-members', context, id, members } ) )>
+  <if( Object.keys( component.Actives ).length )>
+    <for|id, context| in=component.Actives>
+      <Context key=id ...context/>
+    </for>
+  </if>
+  <else><StartContext on-start('onOpen', null )/></else>
+</context>

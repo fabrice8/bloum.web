@@ -1,0 +1,398 @@
+
+import Initialize from './Init'
+import Connection from './Connect'
+import Listeners from './Listeners'
+import InitBannerImage from './assets/social-learning.png'
+
+static const toBloumHeaders = {
+  headers: {
+    'Content-Type': 'application/json',
+    'X-User-Agent': 'Bloum.WEB/1.0'
+  },
+  authType: 'bat'
+}
+
+class {
+  onCreate({ Declare, tenant, user }){
+    
+    this.state = {
+      space: null,
+      people: {},
+      allContexts: {}, // All opened contexts of this userspace
+      context: {}, // Active context, type: community, group, DM
+
+      // Create user profile informations: People Type
+      profile: {
+        id: user.email,
+        name: getFullname( user ),
+        photo: user.photo,
+        isAdmin: user.role === 'SUPER',
+        display: {
+          email: user.email, 
+          phone: user.phone,
+          country: user.country
+        }
+      },
+      // Hold temporary profile information of other peers
+      peopleProfile: null,
+
+      online: false,
+      loading: true,
+      sessionError: null,
+
+      showProfile: false,
+      showPeopleList: false,
+      showSidebar: true,
+      showModal: false
+    }
+
+    Declare( this, ['UIStore', 'Request'] )
+
+    // Bloum Server BaseURL & API Version
+    this.server = this.App.env === 'production' ? 'https://bis.webmicros.com' : 'http://api.bloum.io:26800'
+    this.baseURL =
+    this.App.data.baseURL = `${this.server}/v1`
+
+    this.email = user.email
+    this.sessionUp = false
+
+    // Fetch previous connection space id of this tenant
+    this.spaceId =
+    this.App.data.spaceId = tenant.settings.bis
+                            && tenant.settings.bis.spaceId
+                            || this.App.UIStore.get( this.ucAttr('space-id', tenant.domains.full ) )
+
+    // Fetch previous connection stored token of this user
+    this.accessToken = 
+    this.App.data.accessToken = user.settings.bisToken
+                                || this.App.UIStore.get( this.ucAttr('access-token') )
+
+    // Take user to walkthrough: Default `true` for new space creation
+    this.walkthrough = false
+    // allContexts & Previous active context
+    const { list, active } = this.App.UIStore.get( this.ucAttr('all-contexts') ) || {}
+    list && this.setState({ allContexts: list, context: active })
+  }
+  onMount(){ Initialize( this, toBloumHeaders ) }
+  onInput({ payload, mode }){
+    if( mode == 'qs' ) this.state.showSidebar = false 
+    // Run input action
+    this.once('update', () => this.sessionUp && this.actionControl( payload ) )
+  }
+
+  onSideBar( status ){
+    this.input.mode == 'qs' ?
+        setTimeout( () => { this.state.showSidebar = status }, 300 )
+        : this.state.showSidebar = status
+  }
+  onShowProfile( id ){
+
+    if( id === false ){
+      this.setState({ peopleProfile: null, showProfile: false })
+      return
+    }
+    // See profile other than this user's
+    if( id !== 'me' ) 
+      this.state.peopleProfile = this.state.people[ id ]
+
+    this.state.showProfile = true
+  }
+  onShowPeopleList( status ){ this.state.showPeopleList = status }
+  onUpdateContexts( list ){
+
+    this.state.allContexts = { ...( this.state.allContexts), ...list }
+    // Save
+    !this.App.UIStore.get( this.ucAttr('all-contexts') ) ?
+                          // New store
+                          this.App.UIStore.set( this.ucAttr('all-contexts'), { list: this.state.allContexts, active: this.state.context } )
+                          // Update store
+                          : this.App.UIStore.update( this.ucAttr('all-contexts'), { list: this.state.allContexts } )
+  }
+  onFocusContext(){
+    // Close sidebar on `qs` mode
+    if( this.input.mode == 'qs' && this.state.showSidebar )
+      this.state.showSidebar = false
+  }
+  onModal( dataset ){
+
+    // Close the form
+    if( dataset === false ){
+      this.state.showModal = false
+      return
+    }
+
+    this.state.showModal = dataset
+  }
+  ucAttr( attribute, prefix ){ return ( prefix || this.email )+'--'+ attribute }
+  actionControl( payload ){
+    if( !payload ) return
+    
+    switch( payload.action ){
+      case 'open:group': this.onOpen('group', { id: payload.body.groupId }); break
+    }
+  }
+
+  async getUserAccessToken(){
+    try {
+      const 
+      payload = {
+        ...toBloumHeaders,
+        method: 'POST',
+        body: this.state.profile
+      },
+      // Add current user to people list and get his access `token`
+      { error, message, token } = await this.App.Request(`/space/people/add?spaceId=${this.state.space.spaceId}`, payload )
+      if( error ) throw new Error( message )
+
+      return token
+    }
+    catch( error ){
+      debugLog('[Bloum]: Failed Getting User Access Credentials: ', error ) 
+      return false
+    }
+  }
+  async loadSession(){
+    // Initiate Socket connection
+    this.Connect = new Connection( this, this.server )
+    try { await this.Connect.initiate() }
+    catch( error ){ debugLog('Failed to establish socket connection: ', error ) }
+
+    // Initialize space event listeners
+    Listeners( this )
+
+    // Run input action after session loaded
+    this.sessionUp = true
+    this.input.payload && this.actionControl( this.input.payload )
+  }
+  async onOpen( type, context ){
+    // No active context
+    if( !type ){
+      this.state.context = {}
+      return
+    }
+    
+    // Mount new context
+    let contextData
+    if( !this.state.allContexts.hasOwnProperty( context.id ) ){
+      // Auto-start DM if not exist in userspace
+      if( type == 'DM' )
+        try {
+          const { status, DM, DMId, token } = await this.startDM( context )
+
+          if( status == 'DM::EXIST' ){
+            contextData = { DM }
+
+            context.id = DM.DMId
+            context.token = DM.token
+          }
+          else {
+            context.id = DMId
+            context.token = token
+          }
+        }
+        catch( error ){ 
+          debugLog('Failed Starting DM: ', error )
+          return
+        }
+      
+      // Fetch the new context information
+      if( !contextData )
+        try {
+          const 
+          response = await this.App.Request(`${this.baseURL}/${type}/${context.id}`, { method: 'GET', headers: this.App.data.headers })
+          if( response.error ) throw new Error( response.message )
+          
+          contextData = response
+        }
+        catch( error ){
+          debugLog('Failed Fetching Context Information: ', error )
+          return
+        }
+      
+      switch( type ){
+        case 'DM': const { peers, lastChat } = contextData.DM
+                    this.state.context = { type, ...context, peers, lastChat }
+                    this.state.allContexts[ context.id ] = this.state.context
+            break
+        case 'group': this.state.context = {
+                        type, 
+                        ...context, 
+                        name: contextData.group.name, 
+                        logo: contextData.group.logo,
+                        isPrivate: contextData.group.private,
+                        members: contextData.group.members,
+                        memberCount: contextData.group.members && contextData.group.members.length || 0 
+                      }
+                      this.state.allContexts[ context.id ] = this.state.context
+            break
+        case 'community': const { name, logo, totalPosts, members, tags } = contextData.community
+                      this.state.context = {
+                        type, 
+                        ...context, 
+                        name, 
+                        logo, 
+                        tags,
+                        members,
+                        isPrivate: contextData.community.private,
+                        totalPosts: totalPosts || 0,
+                        memberCount: members && members.length || 0 
+                      }
+                      this.state.allContexts[ context.id ] = this.state.context
+            break
+      }
+      
+      // Store new contexts change
+      this.App.UIStore.set( this.ucAttr('all-contexts'), {
+        list: this.state.allContexts,
+        active: !this.state.context.hidden ? this.state.context : {}
+      })
+      
+      // Join the context room if not yet
+      this.Connect.emit('JOIN', type, context.id )
+    }
+    // Use already pinned context
+    else {
+      debugLog('Context Exist: ', context )
+      context = this.state.allContexts[ context.id ]
+
+      // Cannot mount an active context again
+      /* TEMPORARY: Disable cause preventing opening
+                    context after being hidden
+      */
+      // if( this.state.context.id === context.id ) return
+
+      // Mount and Store new active context
+      delete context.hidden // Make visible if wasn't
+      this.state.context = { type, ...context }
+
+      this.App.UIStore.update( this.ucAttr('all-contexts'), { active: this.state.context } )
+    }
+    
+    // Remove sidebar on `qs` mode when opening a context
+    if( this.input.mode == 'qs' ) this.state.showSidebar = false
+  }
+  async startDM( people ){
+    try {
+      const 
+      payload = { method: 'POST', body: people, headers: this.App.data.headers },
+      response = await this.App.Request(`${this.baseURL}/DM/start`, payload )
+      if( response.error ) throw new Error( response.message )
+      
+      return response
+    }
+    catch( error ){ throw new Error( error ) }
+  }
+}
+
+<div#Bloum class=input.theme.mode>
+  <if( state.sessionError )>
+    <div.h-100.w-100.d-flex.align-items-center.justify-content-center>
+      <div.w-75.text-center.px-5>
+        <Switch by=state.sessionError.type>
+          <@case is="INFO"><Bx.font-large-5.text-info type="info-circle"/></@case>
+          <@case is="IMPORTANT"><Bx.font-large-5.text-warning type="error"/></@case>
+        </Switch>
+        <br><br>
+        <p.font-medium-4><Locale text=state.sessionError.message/></p>
+      </div>
+    </div>
+  </if>
+
+  <else-if( state.loading )>
+    <div.h-100.d-flex.align-items-center.justify-content-center>
+      <div.w-75.text-center.p-4>
+        <if( !component.accessToken )>
+          <img.img-fluid src=InitBannerImage/>
+          <h5.py-75>
+            <Locale>Ultimate Social Learning Environment</Locale>
+          </h5>
+          <p.px-5.font-medium-1>
+            <Locale>
+              Learn better by hanging out with your mates, instructors, ... around 
+              interesting community posts, groups and even inbox them for more insights.
+            </Locale>
+          </p>
+          <br><br>
+        </if>
+
+        <span.font-small-3>
+          <Locale text="Initialization"/> ...
+        </span>
+      </div>
+    </div>
+  </else-if>
+
+  <else>
+    <Row.no-gutters class="content-area-wrapper">
+      <@col qs=`position-absolute zindex-3 col-8 animated slideInLeft fast ${!state.showSidebar ? 'd-none' : ''}` 
+            hs="col-4" 
+            fs="col-2" 
+            class="p-0">
+        <div>
+          <!-- User Profile -->
+          <if( state.showProfile )>
+            <Profile profile=(state.peopleProfile || state.profile)
+                      on-dismiss('onShowProfile', false )/>
+          </if>
+          <!-- User People List -->
+          <if( state.showPeopleList )>
+            <PeopleList list=newObject(state.people)
+                        profile=state.profile
+                        on-dismiss('onShowPeopleList', false )
+                        on-open('onOpen')/>
+          </if>
+          <!-- Sidebar -->
+          <Sidebar App=component.App
+                    Connect=component.Connect
+                    profile=state.profile
+                    context=state.context
+                    people=newObject(state.people)
+                    on-show-profile('onShowProfile')
+                    on-show-people('onShowPeopleList', true )
+                    on-add-community('onModal', { type: 'community', mode: 'create' })
+                    on-add-group('onModal', { type: 'group', mode: 'create' })
+                    on-ready('onUpdateContexts')
+                    on-open('onOpen')/>
+        </div>
+      </@col>
+
+      <@col class="col p-0">
+        <div class="content-overlay"></div>
+        <div class="content-wrapper">
+          <div class="content-header row">
+          </div>
+          <div class="content-body">
+            <!-- app chat window start -->
+            <section.position-relative.vh-100 on-click('onFocusContext')>
+              <ContextBody active=state.context
+                            App=component.App
+                            Connect=component.Connect
+                            wsmode=input.mode
+                            tenant=input.tenant
+                            profile=state.profile
+                            people=newObject(state.people)
+                            on-modal('onModal')
+                            on-show-sidebar('onSideBar')
+                            on-show-profile('onShowProfile')/>
+              
+              <!-- Form & Option Modals -->
+              <if( state.showModal )>
+                <Modal App=component.App
+                        options=state.showModal
+                        spaceId=state.space.spaceId
+                        people=newObject(state.people)
+                        on-done('onOpen')
+                        on-dismiss('onModal', false )/>
+              </if>
+            </section>
+          </div>
+        </div>
+      </@col>
+
+      <@col qs="d-none" hs="d-none" fs="col-2" class="p-0">
+        <Profile static=true
+                  profile=(state.peopleProfile || state.profile)/>
+      </@col>
+    </Row>
+  </else>
+</div>

@@ -1,0 +1,25 @@
+
+class {
+  // Handle control actions trigger on a comment
+  onAction( comment, _event, ...args ){ this.emit( _event, comment, ...args ) }
+  // Handle events that happened on a comment
+  onEvent( _event, ...args ){ this.emit( _event, ...args ) }
+}
+
+$ const { list, answers, me, highlight } = input
+<if( input.list.length )>
+  <for|comment, index| of=input.list>
+    <Switch by=comment.sender.id key=`${index}-${comment.datetime}`>
+      <@case is="bot">
+        <ChatBot ...comment/>
+      </@case>
+      <@default>
+        <Answer ...comment
+                me=me
+                answers=answers
+                on-action('onAction', comment )
+                on-event('onEvent', comment.datetime )/>
+      </@default>
+    </Switch>
+  </for>
+</if>

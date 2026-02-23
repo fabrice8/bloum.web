@@ -1,0 +1,84 @@
+
+class {
+  onCreate(){ this.state = { showMenu: false } }
+  onShowMenu( status ){ this.state.showMenu = status }
+  onAction( ...args ){ this.emit('action', ...args ) }
+}
+
+<div.chat.px-2 class=(!input.me ? 'chat-left' : false) href=`#${input.chatId}`>
+  <!-- Display avatar for only the first message of a chain (Same sender) -->
+  <if( !input.chain )>
+    <context|{}, emit| from="ContextBody">
+      <div.chat-avatar on-click( emit, 'show-profile', input.id )>
+        <a.avatar.m-0>
+          <Image.avatar-image src=(input.photo || '/images/default/user.png') alt="avatar"/>
+        </a>
+      </div>
+    </context>
+  </if>
+
+  <div.chat-body.hover-toggle style=( input.me ? 'margin:0 2.5rem 0 0' : 'margin:0 2.5rem 0 2.8rem' )>
+    <!-- Display Message and Medias -->
+    <if( Array.isArray( input.medias ) && input.medias.length )>
+      <div.chat-media.position-relative>
+        <Medias ...input
+                on-uploaded( ( ...args ) => component.emit('event', 'medias-uploaded', ...args ) )
+                on-action('onAction')
+                on-show-options('onShowMenu', true )/>
+
+        <!-- Attached message under medias -->
+        <if( input.message )>
+          <Message withMedias=true ...input
+                    on-action('onAction')
+                    on-show-options('onShowMenu', true )/>
+        </if>
+      </div>
+    </if>
+    <!-- Chat message only -->
+    <else>
+      <Message ...input
+                on-action('onAction')
+                on-show-options('onShowMenu', true )/>
+    </else>
+  </div>
+</div>
+
+<!-- Chat Menu -->
+<if( state.showMenu )>
+  <ActionMenu me=input.me
+              hasMedias=( Array.isArray( input.medias ) && input.medias.length )
+              on-action('onAction')
+              on-dismiss('onShowMenu', false )/>
+</if>
+
+<!--
+<div.chat.px-2>
+  <div class="chat-avatar">
+    <a class="avatar m-0">
+      <img src="/images/default/user.png" alt="avatar" height="36" width="36">
+    </a>
+  </div>
+  <div class="chat-body">
+    <div class="chat-message">
+      <p>Great, Feel free to get in touch on</p>
+      <span class="chat-time">3:34 AM</span>
+    </div>
+    <div class="chat-media">
+      <Row.overflow-hidden>
+        <@col.col-3>
+          <Image.img-fluid.h-100 src=".." icon="bx bx-link-alt"/>
+        </@col>
+        <@col.col.pl-0>
+          <div.chat-media-message>
+            <a href="">https://facebook.com/</a>
+            <div.text-ellipsis-2.font-small-3>
+              <p>Cambridge analytics scandal revealing the back side or the geant social media</p>
+              <span.chat-time>3:35 AM</span>
+            </div>
+          </div>
+        </@col>
+      </Row>
+    </div>
+  </div>
+</div>
+-->

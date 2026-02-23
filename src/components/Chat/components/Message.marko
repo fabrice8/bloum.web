@@ -1,0 +1,31 @@
+
+import moment from 'moment'
+
+<div class=( input.withMedias ? 'chat-media-message' : 'chat-message')>
+  <div.chat-message-container>
+    <!-- Mute text during SENDING or FAILED process -->
+    <p.font-small-3 class=( ['SENDING', 'FAILED'].includes( input.status ) ? 'text-muted' : false )>$!{input.message}</p>
+
+    <!-- Chat menu -->
+    <Bx.chat-menu.position-absolute.zindex-2.right-0.top-0.p-25.m-25.theme-bg-transparent.font-medium-4.hover-inline.cursor-pointer
+        type="dots-vertical-rounded"
+        style="padding-left:1rem"
+        on-click( () => component.emit('show-options') )/>
+
+    <!-- Failed status or Time -->
+    <if( input.status == 'FAILED' )>
+      <Bx.font-medium-5.text-danger.float-right
+          type="info-circle"
+          style="padding-left:1rem"
+          on-click( () => component.emit('action', 'resend-chat') )/>
+    </if>
+    <else><span.chat-time>${moment( input.datetime ).format('hh:mm A')}</span></else>
+  </div>
+  
+  <!-- Chat Tread -->
+  <if( input.thread && input.thread.total )>
+    <Thread ...input.thread
+            on-action( ( ...args ) => component.emit('action', ...args ) )
+            on-show-options( () => component.emit('show-options') )/>
+  </if>
+</div>

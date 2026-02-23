@@ -1,0 +1,55 @@
+
+<div.position-absolute.zindex-4.top-0.w-100.vh-100.animated.bounceIn.fast.d-flex.align-items-center.justify-content-center
+    on-click( () => component.emit('dismiss') )>
+  <div.w-50.theme-bg.p-0.shadow-lg.round>
+    <ul.list-unstyled>
+      <li.px-2.py-75>
+        <Locale.font-small-3.text-muted text="Reaction"/>
+        <ul.list-inline.pt-2>
+          <li><Bx.font-large-1.p-50.text-warning type="smile"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="cool"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="happy"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="tired"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="angry"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="confused"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="wink-smile"/></li>
+          <li><Bx.font-large-1.p-50.text-warning type="laugh"/></li>
+        </ul>
+      </li>
+
+      <li.nav-item.cursor-pointer.px-2.py-75.border-top on-click( () => component.emit('action', 'reply-chat') )>
+        <Locale text="Reply to"/>
+      </li>
+      <li.nav-item.cursor-pointer.px-2.py-75 on-click( () => component.emit('action', 'forward-chat') )>
+        <Locale text="Forward to"/>
+      </li>
+      <li.nav-item.cursor-pointer.px-2.py-75 on-click( () => component.emit('action', 'copy-chat-link') )>
+        <Locale text="Copy Link"/>
+      </li>
+
+      <!-- Only edit/delete personal message -->
+      <if( input.me )>
+        <li.nav-item.cursor-pointer.px-2.py-75.border-top on-click( () => component.emit('action', 'edit-chat') )>
+          <Locale text="Edit message"/>
+        </li>
+        <li.nav-item.cursor-pointer.px-2.py-75 on-click( () => component.emit('action', 'delete-chat') )>
+          <Locale text="Delete message"/>
+        </li>
+      </if>
+
+      <li.nav-item.cursor-pointer.px-2.py-75.border-top on-click( () => component.emit('action', 'save-chat') )>
+        <Locale text="Bookmark/save"/>
+      </li>
+
+      <!-- For only files -->
+      <if( input.hasMedias )>
+        <li.nav-item.cursor-pointer.px-2.py-75.border-top on-click( () => component.emit('action', 'download-media') )>
+          <Locale text="Download"/>
+        </li>
+        <li.nav-item.cursor-pointer.px-2.py-75 on-click( () => component.emit('action', 'delete-media') )>
+          <Locale text="Delete file"/>
+        </li>
+      </if>
+    </ul>
+  </div>
+</div>

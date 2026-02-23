@@ -1,0 +1,140 @@
+
+class {
+	onCreate({ App, members }){
+		
+		this.state = {
+			active: 'home',
+			activePost: null,
+			members: {},
+			selectedComment: false,
+			post: false
+		}
+
+		// Get members as key:value object
+		members && members.map( each => this.state.members[ each.id ] = each )
+
+		App.extend(this)
+	}
+	onHome(){ this.setState({ active: 'home', activePost: null }) }
+	onOpenPost( id ){ this.setState({ active: 'arena', activePost: id }) }
+	onPost( status ){ this.state.post = status }
+}
+
+$ const { id, isPrivate, logo, name, totalPosts, members, tags } = input
+<div.Community-context.w-100.vh-100.theme-bg.amimated.fadeIn.fast.overflow-auto>
+	<!-- Community Header -->
+  <context|{}, emit| from="ContextBody">
+		<div.position-sticky.zindex-1.top-0.theme-bg.border-bottom.px-1>
+			<Row.d-flex.justify-content-between.align-items-center style="height:4.3rem">
+				<@col.col.d-flex.align-items-center>
+					<!-- Show sidebar toggle on `qs` workspace mode -->
+					<if( input.wsmode == 'qs' )>
+						<div.px-75>
+							<span.cursor-pointer.no-translate on-click( emit, 'show-sidebar')>
+								<Bx.font-medium-5 type="dock-left"/>
+							</span>
+						</div>
+					</if>
+
+					<div class="avatar">
+						<if( logo )>
+							<Image.avatar-image src=(logo || '/images/default/user.png') alt="avatar"/>
+						</if>
+						<else><AvatarContent name=name/></else>
+					</div>
+
+					<div.w-100.pl-4>
+						<h6.font-medium-2.my-0>${name}</h6>
+						<span.font-small-3.text-muted>
+							${totalPosts} 
+							<Locale text="Posts"/>
+						</span>
+					</div>
+				</@col>
+
+				<@col.col-4>
+					<ul.list-inline.m-0.d-flex.align-items-center.justify-content-end>
+						<if( state.selectedComment )>
+							<li.px-75>
+								<span>
+									<Bx.font-medium-5 type="share"/>
+								</span>
+							</li>
+							<li.px-75>
+								<span>
+									<Bx.font-medium-5 type="copy"/>
+								</span>
+							</li>
+							<li.px-75>
+								<span>
+									<Bx.font-medium-5 type="trash"/>
+								</span>
+							</li>
+						</if>
+						<else>
+							<!-- Back to posts -->
+							<if( state.active != 'home' )>
+								<li.px-75>
+									<span.cursor-pointer on-click('onHome')>
+										<Bx.font-medium-5.bx-flip-horizontal type="label"/>
+									</span>
+								</li>
+							</if>
+
+							<!-- Display members toggle in private community -->
+							<if( isPrivate )>
+								<li.px-75>
+									<span.cursor-pointer on-click( emit, 'view-members', 'community', id, members )>
+										<Bx.font-medium-5 type="group"/>
+									</span>
+								</li>
+							</if>
+
+							<!-- Trigger search post or comment -->
+							<li.px-75>
+								<span>
+									<Bx.font-medium-5 type="search"/>
+								</span>
+							</li>
+						</else>
+					</ul>
+				</@col>
+			</Row>
+		</div>
+	</context>
+  
+  <!-- Community body -->
+	<Switch by=state.active>
+		<!-- Home -->
+		<@case is="home">
+			<Home communityId=input.id
+						name=input.name
+						App=input.App
+						members=members
+						tags=tags
+						on-open('onOpenPost')
+						on-post-question('onPost', true )/>
+		</@case>
+		<!-- Post Arena -->
+		<@case is="arena">
+			<Arena communityId=input.id
+							postId=state.activePost
+							tags=tags
+							members=( isPrivate ? state.members : input.people )
+							App=input.App
+							profile=input.profile
+							on-home('onHome')
+							on-open('onOpenPost')
+							on-post-question('onPost', true )/>
+		</@case>
+	</Switch>
+
+	<!-- Question/Post Editor -->
+	<if( state.post )>
+		<Post communityId=input.id
+									App=input.App
+									tags=tags
+									on-open('onOpenPost')
+									on-dismiss('onPost', false )/>
+	</if>
+</div>

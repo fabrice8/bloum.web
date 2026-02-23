@@ -1,0 +1,66 @@
+
+
+class {
+  onCreate(){
+    this.state = { members: [], alert: false }
+  }
+  onSelectMember( member, selected ){
+    selected ?
+        this.state.members.push( member ) // Push selected
+        : this.state.members = this.state.members.filter( ({ id }) => { return member.id != id } ) // Remove unselected
+      
+    this.setStateDirty('members')
+  }
+  async onSave(){
+    try {
+      const 
+      payload = {
+        method: 'POST',
+        headers: this.input.App.data.headers,
+        body: this.state.members
+      },
+      url = `${this.input.App.data.baseURL}/${this.input.options.context}/${this.input.options.id}/members/add`,
+      { error, message } = await this.input.App.Request( url, payload )
+      if( error ) throw new Error( message )
+
+      this.state.alert = message
+      setTimeout( () => this.emit('dismiss'), 8000 )
+    }
+    catch( error ){ console.log('Failed Adding Members') }
+  }
+}
+
+<div.position-absolute.zindex-4.top-0.w-100.vh-100.theme-bg-transparent>
+  <div.px-3>
+    <span.position-absolute.top-0.right-0.p-2 on-click( () => component.emit('dismiss') )>
+      <Bx.font-large-1 type="x"/>
+    </span>
+    
+    <h5.py-75.font-medium-3><Locale text="Add Member"/></h5>
+    <br>
+    <ul.list-unstyled>
+      <for|id, each| in=input.people>
+        <!-- Do not display people already member -->
+        <if( !input.options.members.filter( each => { return each.id == id }).length )>
+          <li>
+            <People key=id 
+                    ...each 
+                    checkbox=true
+                    on-select('onSelectMember', each )/>
+          </li>
+        </if>
+      </for>
+    </ul>
+
+    <br>
+    <if( state.alert )>
+      <div.alert.border-info>${state.alert}</div>
+    </if>
+
+    <if( state.members.length )>
+      <button.btn.btn-secondary on-click('onSave')>
+        <Locale text="Save"/>
+      </button>
+    </if>
+  </div>
+</div>

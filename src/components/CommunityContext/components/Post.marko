@@ -1,0 +1,152 @@
+
+import FormHandler from 'markojs-form'
+import QuestionTagImage from './../../../assets/question-tags.png'
+
+class {
+  onCreate({ App }){
+
+    this.state = { posting: false }
+    App.extend(this)
+
+    this.fhandler = new FormHandler({ key: 'post-question', autosave: true, crosscheck: true })
+    this.fhandler.bind(this)
+  }
+  async onPost(){
+    
+    if( !isEmpty( this.state.formError ) 
+        && Object.values( this.state.formError ).includes( true ) ) return
+
+    const body = newObject( this.state.form )
+    
+    // Split tags string to array
+    body.tags = body.tags.split(/\s*,\s*/g)
+    
+    this.state.posting = true
+    try {
+      const 
+      payload = {
+        method: 'POST',
+        headers: this.App.data.headers,
+        body
+      },
+      { error, message, postId } = await this.App.Request(`${this.App.data.baseURL}/community/${this.input.communityId}/post/create`, payload )
+      if( error ) throw new Error( message )
+      
+      this.state.posting = false
+
+      this.fhandler.alert( message )
+      this.fhandler.reset()
+
+      this.emit('open', postId )
+      this.emit('dismiss')
+    }
+    catch( error ){ 
+      debugLog('Failed Posting Post: ', error )
+      this.fhandler.alert('Unexpected Error Occured. Check your internet and retry.')
+      this.state.posting = false
+    }
+  }
+}
+
+<div.position-absolute.w-100.theme-bg.animated.slideInUp.faster style="top:4.3rem">
+  <form.py-1 key="post-question" style="height:calc(100vh - 4.3rem)">
+    <section.px-2>
+      <!-- Title -->
+      <div.form-group>
+        <label><Locale text="Title"/></label>
+        <p.font-small-3.text-muted>
+          <Locale>Be specific and imagine you’re asking a question to another person</Locale>
+        </p>
+        <input.form-control
+              type="text"
+              name="title"
+              validate="required"
+              value=state.form.title
+              on-change('__onChange')/>
+        <if( state.formError.title )>
+          <p.font-small-3.text-warning.py-25>
+            <Locale>Title is required</Locale>
+          </p>
+        </if>
+      </div>
+
+      <!-- Tags -->
+      <div.form-group>
+        <label><Locale text="Tags"/></label>
+        <p.font-small-3.text-muted>
+          <Locale>Add up to 5 tags (comman [,] seperated) to describe what your question is about</Locale>
+        </p>
+        <input.form-control
+              type="text"
+              name="tags"
+              value=state.form.tags
+              on-change('__onChange')/>
+      </div>
+
+      <!-- Body & Editor -->
+      <label><Locale text="Body"/></label>
+      <p.font-small-3.text-muted>
+        <Locale>Include all the information someone would need to answer your question</Locale>
+      </p>
+      <div.border.rounded>
+        <QuillEditor toolbarTop=true
+                      font="small-5"
+                      style="height:32vh;margin:.6rem 0;"
+                      toolbar=['list', 'indent', 'embed-block', 'link', 'latex']
+                      name="body"
+                      value=state.form.body
+                      returnHTML=true
+                      noReturnWordsCount=true
+                      on-change('__onChange')/>
+
+        <!-- Post or cancel buttons -->
+        <div.text-right.p-1>
+          <button.btn.btn-secondary.round type="reset" on-click( () => component.emit('dismiss') )>
+            <Locale text="Cancel"/>
+          </button>
+
+          <if( state.form.title )>
+            <button.btn.btn-primary.round.ml-1 type="submit" on-click('onPost')>
+              <Locale text="Post"/>
+              <Preloader.font-medium-4.float-right active=state.posting/>
+            </button>
+          </if>
+        </div>
+      </div>
+
+      <FormAlert alert=state.alert/>
+    </section>
+    <br>
+
+    <!-- Footer -->
+    <section.px-2.py-1.border-top.theme-bg-fade>
+      <Row>
+        <@col>
+          <h6.font-medium-4>
+            <Locale text="Asking a good question"/>
+          </h6>
+
+          <p.font-small-3.py-50>
+            <Locale>
+              Before you post, search in the community to make sure your question hasn’t been answered.
+            </Locale>
+          </p>
+  
+          <ul.list-unstyled.font-small-3>
+            <li><Locale>— Summarize the problem</Locale></li>
+            <li><Locale>— Describe what you’ve tried</Locale></li>
+            <li><Locale>— When appropriate, show some examples</Locale></li>
+          </ul>
+        </@col>
+        <@col.col-4.py-75.text-center>
+          <img.w-75 src=QuestionTagImage/>
+
+          <br><br><br>
+          <button.btn.btn-secondary.round>
+            <Locale text="Explore Questions"/>
+          </button>
+        </@col>
+      </Row>
+    </section>
+  </form>
+</div>

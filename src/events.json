@@ -1,0 +1,43 @@
+[
+  "space.updated",
+  "space.deleted",
+
+  "people.added",
+  "people.edited",
+  "people.left",
+  "people.removed",
+  
+  "dm.started",
+  "dm.updated",
+  "dm.deleted",
+
+  "group.created",
+  "group.updated",
+  "group.deleted",
+  
+  "community.created",
+  "community.updated",
+  "community.deleted",
+
+  "member.added",
+  "members.added",
+  "member.updated",
+  "member.removed",
+  "member.left",
+  
+  "post.created",
+  "post.updated",
+  "post.deleted",
+  "post.answered",
+  "post.answer.voted",
+  "post.answer.unvoted",
+
+  "message",
+  "message.edited",
+  "message.deleted",
+
+  "comment",
+  "comment.edited",
+  "comment.liked",
+  "comment.deleted"
+]

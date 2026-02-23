@@ -1,0 +1,146 @@
+import ChatHandler from '../../ChatHandler'
+
+class {
+	onCreate({ App, Connect, id, name, members, profile }){
+		
+		App.extend(this)
+		
+		// bind chat handler
+		this.hdl = new ChatHandler( this, Connect, { type: 'group', id, name, profile, members } )
+	}
+}
+
+$ const { id, logo, name } = input
+<div.group-context.w-100.vh-100.theme-bg-fade key=id on-click( component.hdl.onFocus )>
+	<!-- Chat Header -->
+  <context|{}, emit| from="ContextBody">
+		<div.position-sticky.zindex-1.top-0.theme-bg-transparent.border-bottom.px-1>
+			<Row.d-flex.justify-content-between.align-items-center style="height:4.3rem">
+				<@col.col.d-flex.align-items-center>
+					<!-- Show sidebar toggle on `qs` workspace mode -->
+					<if( input.wsmode == 'qs' )>
+						<div.px-75>
+							<span.cursor-pointer.no-translate on-click( emit, 'show-sidebar')>
+								<Bx.font-medium-5 type="dock-left"/>
+							</span>
+						</div>
+					</if>
+					
+					<div.avatar on-click( emit, 'show-group', component.hdl.peer.id )>
+						<if( logo )>
+							<Image.avatar-image src=logo alt="logo"/>
+						</if>
+						<else><AvatarContent name=name/></else>
+					</div>
+	
+					<div.w-100.pl-4.cursor-pointer.no-translate on-click( emit, 'show-group', component.hdl.peer.id )>
+						<!-- Peer name -->
+						<h6.font-medium-2.my-0>${name}</h6>
+						<!-- Peer doing indicator -->
+						<if( state.doing )>
+							<span.font-small-3.text-muted><Locale text=state.doing.toCapitalCase()/>...</span>
+						</if>
+					</div>
+				</@col>
+				<@col.col-5>
+					<if( input.isPrivate )>
+						<ul.list-unstyled.users-list.m-0.d-flex.align-items-center.justify-content-end>
+							$ const members = Object.values( state.members )
+							
+							<if( members.length > 3 )>
+								<for|index| from=0 to=2 step=1>
+									$ const { id, photo, name } = members[ index ]
+									<li.avatar.pull-up.shadow key=index title=name on-click( emit, 'show-profile', id )>
+										<Image.rounded-circle.border-none 
+													src=(photo || '/images/default/user.png') 
+													alt="Avatar" 
+													style="width:30px;height:30px"/>
+									</li>
+								</for>
+	
+								<!-- Remaing number of members -->
+								<li.avatar.border.theme-bg-transparent.pl-50.d-flex.align-items-center
+										style="width:30px;height:30px"
+										on-click( emit, 'view-members', 'group', id, members )>
+									<p.text-muted.mb-0.font-small-3>+${members.length - 3}</p>
+								</li>
+							</if>
+	
+							<else>
+								<for|{ id, photo, name }, index| of=members>
+									<li.avatar.pull-up.shadow key=index title=name on-click( emit, 'show-profile', id )>
+										<Image.rounded-circle.border-none 
+													src=(photo || '/images/default/user.png') 
+													alt="Avatar" 
+													style="width:30px;height:30px"/>
+									</li>
+								</for>
+	
+								<!-- Add more member toggler -->
+								<li.avatar.border.theme-bg-transparent.d-flex.align-items-center.justify-content-center 
+										style="width:30px;height:30px"
+										on-click( emit, 'add-member', 'group', id, members )>
+									<Bx type="plus"/>
+								</li>
+							</else>
+						</ul>
+					</if>
+					<else>
+						<div.d-flex.align-items-center.justify-content-end>
+							<Bx.font-medium-5 type="group"/>
+							<Locale.px-50 text="Public"/>
+						</div>
+					</else>
+				</@col>
+			</Row>
+		</div>
+	</context>
+  
+  <!-- Chat body -->
+  <div.chat-wrapper.overflow-auto 
+			key="scroll-body"
+			style="height:calc(100% - 12rem);padding:1rem 0 4rem 0">
+		<div.chat-content>
+			<ChatBot ...component.hdl.chatBot/>
+
+			<for|section, index| of=state.chats>
+				<!-- Add sectionIdx to `onChatAction` for case 
+						it'll be needed: Eg. delete chat -->
+				<ChatSection key=`section-${index}`
+											list=section
+											me=component.hdl.me
+											highlight=( index == state.chats.length - 1 && state.hasNewMessages ? 'new' : false )
+											previousChat=component.hdl.previousChat
+											on-send-chat( component.hdl.sendChat )
+											on-resend-chat( component.hdl.sendChat )
+											on-medias-uploaded( component.hdl.sendChat )
+											on-save-chat( component.hdl.onChatAction , 'save', index )
+											on-edit-chat( component.hdl.onChatAction , 'edit', index )
+											on-reply-chat( component.hdl.onChatAction , 'reply', index )
+											on-delete-chat( component.hdl.onChatAction , 'delete', index )
+											on-forward-chat( component.hdl.onChatAction , 'forward', index )
+											on-copy-chat-link( component.hdl.onChatAction , 'copy-link', index )
+											on-delete-media( component.hdl.onChatAction , 'delete-media', index )
+											on-forward-media( component.hdl.onChatAction , 'forward-media', index )
+											on-download-media( component.hdl.onChatAction , 'download-media', index )/>
+			</for>
+		</div>
+  </div>
+	
+	<!-- Chat toolbar -->
+	<Textarea type="message"
+						mode="advanced"
+						action=state.mountAction
+						placeholder="Type message"
+						on-press-enter( state.mountAction.type === 'reply' ?  component.hdl.onToReply  :  component.hdl.onToSend  )
+						on-input( component.hdl.onTextareaInput )
+						on-action-change( component.hdl.onChatApplyChange )
+						on-cancel-action( component.hdl.onChatAction , false )/>
+</div>
+
+<!-- Prompt dialog for important alerts & actions confirmation -->
+<if( state.showDialog )>
+	<DialogModal ...state.showDialog 
+								hs=8 qs=10
+								on-dismiss('dialog', false )/>
+</if>

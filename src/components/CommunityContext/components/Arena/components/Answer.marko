@@ -1,0 +1,75 @@
+
+<section.border-top.py-1>
+  <div style="margin-left:5rem">
+    <!-- Status of the anwser: Voted or not -->
+    <span.float-left style="margin-left:-3rem">
+      $ const isVoted = input.answers.includes( input.commentId )
+
+      <Bx.font-large-1.p-50.border.rounded-circle
+          class=`text-${isVoted ? 'success' : 'warning'}`
+          type=( isVoted ? 'check' : 'bulb' )/>
+    </span>
+    
+    <!-- answer body -->
+    <div.answer.px-2.hover-toggle>
+      <!-- answer content -->
+      <p>$!{input.content}</p>
+      <Row>
+        <!-- Toggle Actions -->
+        <@col>
+          <ul.list-inline.m-0.py-1>
+            <li.px-50.cursor-pointer.d-inline-flex.align-items-center
+                on-click( () => component.emit('action', 'like') )>
+              <Bx.font-medium-4 type="upvote"/>
+              <span.px-50>${input.likes.total}</span>
+            </li>
+
+            <li.px-50.cursor-pointer.hover-show>
+              <Bx.font-medium-4 type="bookmark"/>
+            </li>
+            <li.px-50.cursor-pointer.hover-show
+                on-click( () => component.emit('action', 'reply') )>
+              <Bx.font-medium-4 type="comment-add"/>
+            </li>
+
+            <!-- Edit by the author -->
+            <if( input.me.id == input.sender.id )>
+              <li.px-50.cursor-pointer.hover-show
+                  on-click( () => component.emit('action', 'edit') )>
+                <Bx.font-medium-4 type="pencil"/>
+              </li>
+              <li.px-50.cursor-pointer.hover-show
+                  on-click( () => component.emit('action', 'delete') )>
+                <Bx.font-medium-4 type="trash"/>
+              </li>
+            </if>
+          </ul>
+        </@col>
+        <!-- Author info -->
+        <@col.col-5.py-0>
+          <div.d-flex.align-items-center>
+            <div class="avatar">
+              <Image.avatar-image src=(input.sender.photo || '/images/default/user.png') alt="avatar"/>
+            </div>
+            <div.w-100.pl-4>
+              <h6.font-medium-1.my-0>${input.sender.name}</h6>
+              <span.font-small-3.text-muted>${formatDate( input.datetime, 'calendar' )}</span>
+            </div>
+          </div>
+        </@col>
+      </Row>
+    </div>
+
+    <!-- Comments -->
+    <if( input.thread.list.length )>
+      <section.comments>
+        <for|comment, index| of=input.thread.list>
+          <Comment key=index 
+                    ...comment
+                    me=input.me
+                    on-action( ( ...args ) => component.emit('action', ...args ) )/>
+        </for>
+      </section>
+    </if>
+  </div>
+</section>

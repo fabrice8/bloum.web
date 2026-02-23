@@ -1,0 +1,22 @@
+
+$ {
+  const 
+  names = input.name.split(/\s+/g),
+  colors = [ 'white', 'green', 'cyan', 'teal', 'amber', 'purple', 'orange', 'brown', 'blue', 'red', 'lime', 'indigo'],
+  initials = []
+
+  let count = 0
+
+  names.map( each => {
+    if( count > 1 ) return // Only 2 initials are required
+
+    initials.push( each.charAt(0) )
+    count++
+  } )
+}
+
+<span.d-flex.align-items-center.justify-content-center.rounded-circle.white-text
+      class=`${colors[random(0, 9)]}`
+      style="width:36px;height:36px;">
+  ${initials.join('').toUpperCase()}
+</span>
