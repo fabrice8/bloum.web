@@ -6,10 +6,10 @@ export default function Connect( app, baseURL ){
   
   this.app = app
   this.options = {
-    extraHeaders: { 'X-User-Agent': 'Bloum.EXT/1.0' },
+    // Bloum takes websockets only; a browser can't set headers on one, so the agent rides in auth
+    transports: ['websocket'],
     reconnectionDelayMax: 20000,
-    withCredentials: true,
-    auth: { token: app.accessToken }
+    auth: { token: app.accessToken, agent: 'Bloum.EXT/1.0' }
   }
   this.socket = null
   this.isConnected = false
